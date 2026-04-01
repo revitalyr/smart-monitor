@@ -25,7 +25,7 @@ target_link_libraries(smart_monitor
     ${GST_LIBRARIES}
     ${GST_APP_LIBRARIES}
     ${GST_VIDEO_LIBRARIES}
-    ${CMAKE_SOURCE_DIR}/target/release/libmotion.a
+    ${CMAKE_SOURCE_DIR}/firmware/rust_modules/motion/target/release/libmotion.a
     pthread
     m
     dl
