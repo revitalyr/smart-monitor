@@ -1,7 +1,20 @@
 #include "video/v4l2_capture.h"
-#include "video/gstreamer_pipeline.h"
 #include "net/http_server.h"
 #include "net/webrtc_server.h"
+#include "ffi/rust_bridge.h"
+
+#ifdef ENABLE_AUDIO
+#include "audio/audio_capture.h"
+#include "audio/noise_detection.h"
+#endif
+
+#ifdef ENABLE_SENSORS
+#include "sensors/i2c_sensor.h"
+#include "sensors/spi_device.h"
+#include "comm/uart_interface.h"
+#include "esp32/esp32_device.h"
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,11 +23,6 @@
 #include <time.h>
 #include <stdbool.h>
 #include <getopt.h>
-
-#include "video/v4l2_capture.h"
-#include "net/http_server.h"
-#include "net/webrtc_server.h"
-#include "ffi/rust_bridge.h"
 
 #define DEFAULT_PORT 8080
 #define DEFAULT_DEVICE "/dev/video0"
@@ -279,10 +287,49 @@ int main(int argc, char* argv[]) {
     }
     #endif
     
-    // Set HTTP server callbacks
-    http_server_set_metrics_callback(http_server, metrics_callback_wrapper);
-    http_server_set_health_callback(http_server, health_callback_wrapper);
-    http_server_set_webrtc_callback(http_server, webrtc_callback_wrapper);
+    // Initialize optional components
+    #ifdef ENABLE_AUDIO
+    audio_capture_t* audio = audio_create_mock();
+    if (audio && audio_initialize(audio, 44100, 1)) {
+        audio_start_capture(audio);
+        log_message("INFO", "Audio capture initialized");
+    }
+    
+    noise_detector_t* noise_detector = noise_detector_create(44100);
+    if (noise_detector && noise_detector_initialize(noise_detector)) {
+        log_message("INFO", "Noise detection initialized");
+    }
+    #endif
+    
+    #ifdef ENABLE_SENSORS
+    // I2C sensor
+    i2c_sensor_t* i2c_sensor = i2c_create_mock();
+    if (i2c_sensor && i2c_initialize(i2c_sensor)) {
+        log_message("INFO", "I2C sensor initialized");
+    }
+    
+    // SPI device (IMU)
+    spi_device_t* spi_device = spi_create_mock();
+    if (spi_device && spi_initialize(spi_device, 0, 1000000)) {
+        log_message("INFO", "SPI IMU device initialized");
+    }
+    
+    // UART interface
+    uart_interface_t* uart = uart_create_mock();
+    if (uart && uart_initialize(uart, 115200)) {
+        log_message("INFO", "UART interface initialized");
+    }
+    
+    // ESP32 device
+    esp32_device_t* esp32 = esp32_create_mock();
+    if (esp32 && esp32_initialize(esp32, 115200)) {
+        if (esp32_connect(esp32)) {
+            log_message("INFO", "ESP32 device connected");
+        }
+    }
+    #endif
+    
+    log_message("INFO", "All components initialized");
     
     // Start camera capture
     if (v4l2_is_initialized(camera)) {
@@ -378,6 +425,74 @@ int main(int argc, char* argv[]) {
                                            sizeof(metrics->last_motion_time) - 1);
                                 }
                             }
+                            
+                            #ifdef ENABLE_AUDIO
+                            // Audio analysis
+                            if (audio && noise_detector) {
+                                uint8_t audio_samples[4096];
+                                int samples_read = audio_read_samples(audio, audio_samples, sizeof(audio_samples));
+                                if (samples_read > 0) {
+                                    noise_metrics_t noise_metrics = noise_detector_analyze(noise_detector, audio_samples, samples_read);
+                                    
+                                    // Log significant events
+                                    if (noise_metrics.baby_crying_detected) {
+                                        log_message("ALERT", "Baby crying detected!");
+                                    }
+                                    if (noise_metrics.screaming_detected) {
+                                        log_message("ALERT", "Screaming detected!");
+                                    }
+                                }
+                            }
+                            #endif
+                            
+                            #ifdef ENABLE_SENSORS
+                            // Sensor data collection
+                            static uint32_t sensor_counter = 0;
+                            sensor_counter++;
+                            
+                            // I2C sensor reading
+                            if (i2c_sensor && sensor_counter % 100 == 0) {
+                                sensor_data_t sensor_data = i2c_read_sensor_data(i2c_sensor);
+                                char sensor_msg[128];
+                                snprintf(sensor_msg, sizeof(sensor_msg), 
+                                        "I2C: T=%.1f°C H=%.1f%% L=%d M=%s",
+                                        sensor_data.temperature, sensor_data.humidity,
+                                        sensor_data.light_level, sensor_data.motion_detected ? "YES" : "NO");
+                                log_message("SENSOR", sensor_msg);
+                            }
+                            
+                            // SPI IMU reading
+                            if (spi_device && sensor_counter % 50 == 0) {
+                                imu_data_t imu_data = spi_read_imu_data(spi_device);
+                                char imu_msg[128];
+                                snprintf(imu_msg, sizeof(imu_msg),
+                                        "IMU: ACC(%d,%d,%d) GYRO(%d,%d,%d)",
+                                        imu_data.accelerometer_x, imu_data.accelerometer_y, imu_data.accelerometer_z,
+                                        imu_data.gyroscope_x, imu_data.gyroscope_y, imu_data.gyroscope_z);
+                                log_message("SENSOR", imu_msg);
+                            }
+                            
+                            // ESP32 device reading
+                            if (esp32 && sensor_counter % 200 == 0) {
+                                esp32_sensor_data_t esp32_data = esp32_read_sensors(esp32);
+                                char esp32_msg[128];
+                                snprintf(esp32_msg, sizeof(esp32_msg),
+                                        "ESP32: T=%.1f°C H=%.1f%% BAT=%d%% L=%d",
+                                        esp32_data.temperature, esp32_data.humidity,
+                                        esp32_data.battery_level, esp32_data.light_level);
+                                log_message("SENSOR", esp32_msg);
+                                
+                                // Send data via UART
+                                if (uart) {
+                                    uart_log_message(uart, "DATA", esp32_msg);
+                                }
+                            }
+                            
+                            // UART command processing
+                            if (uart && sensor_counter % 300 == 0) {
+                                uart_process_commands(uart);
+                            }
+                            #endif
                         }
                     } else {
                         fprintf(stderr, "Invalid frame size: %zu\n", gray_size);

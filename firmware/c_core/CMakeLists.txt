@@ -53,11 +53,15 @@ set(SOURCES
 
 # Conditional source additions
 if(ENABLE_AUDIO)
-    list(APPEND SOURCES audio/audio_capture.c)
+    list(APPEND SOURCES audio/audio_capture.c audio/noise_detection.c)
 endif()
 
 if(ENABLE_SENSORS)
-    list(APPEND SOURCES sensors/i2c_sensor.c)
+    list(APPEND SOURCES 
+        sensors/i2c_sensor.c 
+        sensors/spi_device.c 
+        comm/uart_interface.c 
+        esp32/esp32_device.c)
 endif()
 
 if(ENABLE_WEBRTC)
