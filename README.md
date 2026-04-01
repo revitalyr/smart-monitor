@@ -16,7 +16,7 @@ A production-level embedded video monitoring system with real-time motion detect
 
 ### Development
 - CMake 3.16+
-- GCC/Clang with C++17 support
+- GCC/Clang with C11 support
 - Rust 1.70+
 - GStreamer 1.16+ with plugins
 - libv4l-dev
@@ -29,7 +29,7 @@ A production-level embedded video monitoring system with real-time motion detect
 
 ## 🛠️ Installation
 
-### From Source
+### From Source (C Version)
 
 ```bash
 # Clone repository
@@ -41,19 +41,19 @@ cd firmware/rust_modules/motion
 cargo build --release
 cd ../../..
 
-# Build C++ application
+# Build C application
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 
 # Run application
-./build/firmware/cpp_core/smart_monitor
+./build/firmware/c_core/smart_monitor
 ```
 
-### Quick Demo
+### Quick Demo (C Version)
 
 ```bash
-# Run demo script
-./scripts/run_demo.sh
+# Run C build script
+./scripts/build_c.sh
 ```
 
 ### Docker Deployment
@@ -136,16 +136,16 @@ The system provides real-time metrics including:
 ```
 smart-monitor/
 ├── firmware/
-│   ├── cpp_core/           # C++ application core
-│   ├── rust_modules/       # Rust processing modules
-│   └── drivers/           # Hardware interface drivers
-├── web/dashboard/         # Web frontend
+│   ├── c_core/              # C application core
+│   ├── rust_modules/        # Rust processing modules
+│   └── drivers/            # Hardware interface drivers
+├── web/dashboard/          # Web frontend
 ├── linux/
-│   ├── systemd/          # systemd service files
-│   └── configs/          # Configuration files
-├── docker/              # Containerization
-├── scripts/             # Build and demo scripts
-└── docs/               # Documentation
+│   ├── systemd/           # systemd service files
+│   └── configs/           # Configuration files
+├── docker/               # Containerization
+├── scripts/              # Build and demo scripts
+└── docs/                # Documentation
 ```
 
 ### Building for ARM (Cross-compilation)

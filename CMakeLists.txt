@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
-project(smart_monitor)
+project(smart_monitor C)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Find required packages
 find_package(PkgConfig REQUIRED)
@@ -11,7 +11,7 @@ pkg_check_modules(GST_APP REQUIRED gstreamer-app-1.0>=1.16)
 pkg_check_modules(GST_VIDEO REQUIRED gstreamer-video-1.0>=1.16)
 
 # Add subdirectories
-add_subdirectory(firmware/cpp_core)
+add_subdirectory(firmware/c_core)
 
 # Rust static library build
 add_custom_command(
