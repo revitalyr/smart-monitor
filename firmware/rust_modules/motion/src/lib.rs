@@ -37,7 +37,7 @@ pub extern "C" fn detect_motion(
     diff_count > len / 20
 }
 
-/// Advanced motion detection with detailed metrics
+/// Advanced motion detection with adaptive threshold
 #[no_mangle]
 pub extern "C" fn detect_motion_advanced(
     prev: *const u8,
@@ -46,7 +46,8 @@ pub extern "C" fn detect_motion_advanced(
     height: u32,
     threshold: u8,
 ) -> MotionResult {
-    if prev.is_null() || curr.is_null() || width == 0 || height == 0 {
+    // Safety checks
+    if prev.is_null() || curr.is_null() {
         return MotionResult {
             motion_detected: false,
             motion_level: 0.0,
@@ -54,31 +55,64 @@ pub extern "C" fn detect_motion_advanced(
         };
     }
     
-    let len = (width * height) as usize;
-    let prev = unsafe { slice::from_raw_parts(prev, len) };
-    let curr = unsafe { slice::from_raw_parts(curr, len) };
-
-    let mut changed_pixels = 0u32;
-    let mut total_diff = 0u64;
-    let threshold_i16 = threshold as i16;
-
-    for i in 0..len {
-        let diff = (prev[i] as i16 - curr[i] as i16).abs();
-        if diff > threshold_i16 {
-            changed_pixels += 1;
-            total_diff += diff as u64;
-        }
+    if width == 0 || height == 0 || width > 10000 || height > 10000 {
+        return MotionResult {
+            motion_detected: false,
+            motion_level: 0.0,
+            changed_pixels: 0,
+        };
     }
-
-    let motion_ratio = changed_pixels as f32 / len as f32;
+    
+    let total_pixels = width as usize * height as usize;
+    
+    // Check for reasonable frame size
+    if total_pixels > 10_000_000 { // 10MP limit
+        return MotionResult {
+            motion_detected: false,
+            motion_level: 0.0,
+            changed_pixels: 0,
+        };
+    }
+    
+    let prev_slice = unsafe { std::slice::from_raw_parts(prev, total_pixels) };
+    let curr_slice = unsafe { std::slice::from_raw_parts(curr, total_pixels) };
+    
+    let mut changed_pixels = 0u32;
+    let mut total_diff = 0u32;
+    let mut noise_level = 0u32;
+    
+    for (i, (&a, &b)) in prev_slice.iter().zip(curr_slice.iter()).enumerate() {
+        let diff = if a > b { a - b } else { b - a };
+        if diff > threshold as u8 {
+            changed_pixels += 1;
+            total_diff += diff as u32;
+        }
+        noise_level += diff as u32;
+    }
+    
+    let motion_ratio = changed_pixels as f32 / total_pixels as f32;
+    let avg_noise = noise_level as f32 / total_pixels as f32;
     let motion_level = if changed_pixels > 0 {
-        (total_diff as f32 / changed_pixels as f32) / 255.0
+        total_diff as f32 / (changed_pixels as f32 * 255.0)
     } else {
         0.0
     };
-
+    
+    // Adaptive threshold based on noise level and motion characteristics
+    let base_threshold = 0.005; // 0.5% base threshold
+    let noise_factor = (avg_noise / 10.0).min(0.02); // Noise compensation
+    let adaptive_threshold = base_threshold + noise_factor;
+    
+    // Additional detection criteria for better sensitivity
+    let significant_motion = changed_pixels > 100 && motion_level > 0.1;
+    let high_density_motion = motion_ratio > 0.001 && total_diff > 500;
+    
+    let motion_detected = motion_ratio > adaptive_threshold || 
+                         significant_motion || 
+                         high_density_motion;
+    
     MotionResult {
-        motion_detected: motion_ratio > 0.05, // 5% threshold
+        motion_detected,
         motion_level,
         changed_pixels,
     }

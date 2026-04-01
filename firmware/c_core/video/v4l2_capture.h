@@ -23,6 +23,7 @@ typedef struct {
     v4l2_buffer_t* buffers;
     size_t buffer_count;
     bool initialized;
+    bool mock_mode;
 } v4l2_capture_t;
 
 // Functions

@@ -133,49 +133,83 @@ int main(void) {
         if (v4l2_is_initialized(camera)) {
             current_frame = v4l2_read_frame_raw(camera, &current_frame_size);
         } else {
-            // Mock frame data for testing
-            current_frame_size = 640 * 480;
+            // Mock frame data with simulated motion
+            current_frame_size = 640 * 480 * 2; // YUYV format
             current_frame = malloc(current_frame_size);
             if (current_frame) {
-                for (size_t i = 0; i < current_frame_size; ++i) {
-                    current_frame[i] = (uint8_t)((i % 256) * ((rand() % 2) ? 1 : 0));
+                static int frame_counter = 0;
+                memset(current_frame, 0x80, current_frame_size); // Gray background
+                
+                // Add moving object that creates motion
+                int object_x = (frame_counter * 10) % (640 - 100) + 50;
+                int object_y = (frame_counter * 5) % (480 - 100) + 50;
+                int object_size = 80;
+                
+                for (int y = object_y; y < object_y + object_size && y < 480; y++) {
+                    for (int x = object_x; x < object_x + object_size && x < 640; x++) {
+                        int pixel_idx = (y * 640 + x) * 2;
+                        if (pixel_idx < current_frame_size - 1) {
+                            // Bright white object for motion detection
+                            current_frame[pixel_idx] = 0xFF; // Y component
+                            current_frame[pixel_idx + 1] = 0x80; // U/V component
+                        }
+                    }
                 }
+                frame_counter++;
             }
         }
         
         if (current_frame && prev_frame) {
-            // Convert to grayscale for motion detection
+            // Convert to grayscale for motion detection (YUYV -> Y)
             size_t gray_size = current_frame_size / 2;
             uint8_t* gray_current = malloc(gray_size);
             uint8_t* gray_prev = malloc(gray_size);
             
             if (gray_current && gray_prev) {
-                for (size_t i = 0, j = 0; i < current_frame_size && j < gray_size; i += 4, ++j) {
-                    gray_current[j] = current_frame[i];
-                    gray_prev[j] = prev_frame[i];
+                for (size_t i = 0, j = 0; i < current_frame_size && j < gray_size; i += 2, ++j) {
+                    gray_current[j] = current_frame[i]; // Y component
+                    gray_prev[j] = prev_frame[i];     // Y component
                 }
                 
                 // Detect motion using Rust module
-                motion_result_t result = rust_detector_detect_motion_advanced(
-                    motion_detector,
-                    gray_prev,
-                    gray_current,
-                    640,
-                    480,
-                    20
-                );
-                
-                if (result.motion_detected) {
-                    metrics_data_t* metrics = http_server_get_metrics(http_server);
-                    if (metrics) {
-                        metrics->motion_events++;
-                        metrics->motion_level = result.motion_level;
-                        strncpy(metrics->last_motion_time, get_current_time(), 
-                               sizeof(metrics->last_motion_time) - 1);
+                if (gray_prev && gray_current && motion_detector) {
+                    // Validate frame data
+                    if (gray_size > 0 && gray_size <= 1000000) { // 1MB limit
+                        // Ensure detector is initialized
+                        if (!rust_detector_initialize(motion_detector)) {
+                            fprintf(stderr, "Failed to initialize motion detector\n");
+                        } else {
+                            // Add signal handler for safety
+                            signal(SIGSEGV, signal_handler);
+                            
+                            motion_result_t result = rust_detector_detect_motion_advanced(
+                                motion_detector,
+                                gray_prev,
+                                gray_current,
+                                640,
+                                480,
+                                20
+                            );
+                            
+                            // Restore default signal handler
+                            signal(SIGSEGV, SIG_DFL);
+                            
+                            if (result.motion_detected) {
+                                metrics_data_t* metrics = http_server_get_metrics(http_server);
+                                if (metrics) {
+                                    metrics->motion_events++;
+                                    metrics->motion_level = result.motion_level;
+                                    strncpy(metrics->last_motion_time, get_current_time(), 
+                                           sizeof(metrics->last_motion_time) - 1);
+                                }
+                                
+                                printf("Motion detected! Level: %.2f, Changed pixels: %u\n", 
+                                       result.motion_level, result.changed_pixels);
+                            }
+                        }
+                    } else {
+                        fprintf(stderr, "Invalid frame size: %zu\n", gray_size);
                     }
-                    
-                    printf("Motion detected! Level: %.2f, Changed pixels: %u\n", 
-                           result.motion_level, result.changed_pixels);
                 }
                 
                 metrics_data_t* metrics = http_server_get_metrics(http_server);

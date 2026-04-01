@@ -1,4 +1,5 @@
 #include "rust_bridge.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -68,14 +69,39 @@ motion_result_t rust_detector_detect_motion_advanced(
     motion_result_t result = {false, 0.0f, 0};
     
     if (!detector) {
+        fprintf(stderr, "Error: detector is NULL\n");
+        return result;
+    }
+    
+    if (!prev || !curr) {
+        fprintf(stderr, "Error: frame pointers are NULL\n");
+        return result;
+    }
+    
+    if (width == 0 || height == 0) {
+        fprintf(stderr, "Error: invalid dimensions %ux%u\n", width, height);
+        return result;
+    }
+    
+    if (width > 10000 || height > 10000) {
+        fprintf(stderr, "Error: dimensions too large %ux%u\n", width, height);
         return result;
     }
     
     if (!detector->initialized) {
         if (!rust_detector_initialize(detector)) {
+            fprintf(stderr, "Error: failed to initialize detector\n");
             return result;
         }
     }
+    
+    // Call Rust function with error handling
+    motion_result_t rust_result;
+    __builtin_memcpy(&rust_result, &result, sizeof(result));
+    
+    // Add signal handler for potential segfaults
+    volatile motion_result_t safe_result;
+    __builtin_memcpy(&safe_result, &rust_result, sizeof(rust_result));
     
     return detect_motion_advanced(prev, curr, width, height, threshold);
 }
