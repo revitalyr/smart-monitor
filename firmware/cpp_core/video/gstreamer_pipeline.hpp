@@ -6,10 +6,10 @@
 #include <cstdint>
 #include <functional>
 
-class GstPipeline {
+class GstPipelineWrapper {
 public:
-    GstPipeline();
-    ~GstPipeline();
+    GstPipelineWrapper();
+    ~GstPipelineWrapper();
     
     bool initialize(const std::string& pipeline_str);
     bool start();
@@ -45,6 +45,7 @@ public:
     bool setAnswer(const std::string& answer);
     
     bool isInitialized() const { return pipeline_ != nullptr; }
+    bool isPlaying() const;
 
 private:
     GstElement* pipeline_;

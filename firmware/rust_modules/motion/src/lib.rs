@@ -128,10 +128,111 @@ mod tests {
             b[i] = 100;
         }
         
-        let result = detect_motion_advanced(a.as_ptr(), b.as_ptr(), width, height, 10);
+        let result = detect_motion_advanced(a.as_ptr(), b.as_ptr(), width as u32, height as u32, 10);
         
         assert!(result.motion_detected);
         assert!(result.changed_pixels == 20);
         assert!(result.motion_level > 0.0);
+    }
+
+    #[test]
+    fn test_null_pointers() {
+        let result = detect_motion_advanced(std::ptr::null(), std::ptr::null(), 10, 10, 10);
+        assert!(!result.motion_detected);
+        assert_eq!(result.changed_pixels, 0);
+        assert_eq!(result.motion_level, 0.0);
+    }
+
+    #[test]
+    fn test_zero_dimensions() {
+        let a = vec![0u8; 100];
+        let b = vec![100u8; 100];
+        
+        let result = detect_motion_advanced(a.as_ptr(), b.as_ptr(), 0, 10, 10);
+        assert!(!result.motion_detected);
+        assert_eq!(result.changed_pixels, 0);
+        assert_eq!(result.motion_level, 0.0);
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        // Test with single pixel
+        let a = vec![0u8; 1];
+        let b = vec![255u8; 1];
+        
+        let result = detect_motion_advanced(a.as_ptr(), b.as_ptr(), 1, 1, 1);
+        assert!(result.motion_detected);
+        assert_eq!(result.changed_pixels, 1);
+        assert!(result.motion_level > 0.9);
+    }
+
+    #[test]
+    fn test_motion_threshold_boundary() {
+        let width = 20;
+        let height = 10;
+        let total_pixels = width * height;
+        let a = vec![0u8; total_pixels];
+        let mut b = vec![0u8; total_pixels];
+        
+        // More than 5% of pixels changed to ensure detection
+        let changed_pixels = total_pixels / 20 + 1; // 11 pixels = 5.5%
+        for i in 0..changed_pixels {
+            b[i] = 100;  // High difference to ensure detection
+        }
+        
+        let result = detect_motion_advanced(a.as_ptr(), b.as_ptr(), width as u32, height as u32, 5); // Lower threshold
+        println!("Total pixels: {}, Changed pixels: {}, Motion detected: {}", 
+                 total_pixels, changed_pixels, result.motion_detected);
+        assert!(result.motion_detected);
+        assert_eq!(result.changed_pixels, changed_pixels as u32);
+    }
+
+    #[test]
+    fn test_motion_level_calculation() {
+        let width = 10;
+        let height = 10;
+        let a = vec![0u8; width * height];
+        let mut b = vec![0u8; width * height];
+        
+        // Set exactly half pixels to max difference
+        for i in 0..50 {
+            b[i] = 255;
+        }
+        
+        let result = detect_motion_advanced(a.as_ptr(), b.as_ptr(), width as u32, height as u32, 10);
+        assert!(result.motion_detected);
+        assert_eq!(result.changed_pixels, 50);
+        assert!((result.motion_level - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_identical_frames() {
+        let a = vec![128u8; 100];
+        let b = vec![128u8; 100];
+        
+        assert!(!detect_motion(a.as_ptr(), b.as_ptr(), 100, 10));
+        
+        let result = detect_motion_advanced(a.as_ptr(), b.as_ptr(), 10 as u32, 10 as u32, 10);
+        assert!(!result.motion_detected);
+        assert_eq!(result.changed_pixels, 0);
+        assert_eq!(result.motion_level, 0.0);
+    }
+
+    #[test]
+    fn test_motion_init_cleanup() {
+        assert!(motion_init());
+        motion_cleanup(); // Should not panic
+    }
+
+    #[test]
+    fn test_different_thresholds() {
+        let a = vec![0u8; 100];
+        let b = vec![50u8; 100];
+        
+        // Low threshold should detect motion
+        assert!(detect_motion(a.as_ptr(), b.as_ptr(), 100, 10));
+        
+        // High threshold should not detect motion
+        assert!(!detect_motion(a.as_ptr(), b.as_ptr(), 100, 60));
     }
 }
