@@ -85,7 +85,6 @@ bool audio_initialize(audio_capture_t* audio, int sample_rate, int channels) {
     audio->fd = 1; // Mark as initialized
     audio->initialized = true;
     
-    printf("Audio initialized: %d Hz, %d channels\n", sample_rate, channels);
     return true;
 }
 
@@ -106,7 +105,6 @@ bool audio_start_capture(audio_capture_t* audio) {
         return false;
     }
     
-    printf("Audio capture started\n");
     return true;
 }
 
@@ -114,8 +112,6 @@ void audio_stop_capture(audio_capture_t* audio) {
     if (!audio) {
         return;
     }
-    
-    printf("Audio capture stopped\n");
 }
 
 int audio_read_samples(audio_capture_t* audio, uint8_t* buffer, int size) {

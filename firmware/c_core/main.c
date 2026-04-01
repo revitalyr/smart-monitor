@@ -234,9 +234,13 @@ int main(int argc, char* argv[]) {
     v4l2_capture_t* camera = v4l2_create(device);
     rust_motion_detector_t* motion_detector = rust_detector_create();
     http_server_t* http_server = http_server_create(config.port);
-    webrtc_server_t* webrtc_server = webrtc_server_create(device);
+    // Initialize WebRTC server (optional)
+    webrtc_server_t* webrtc_server = NULL;
+    #ifdef ENABLE_WEBRTC
+    webrtc_server = webrtc_server_create(device);
+    #endif
     
-    if (!camera || !motion_detector || !http_server || !webrtc_server) {
+    if (!camera || !motion_detector || !http_server) {
         log_message("ERROR", "Failed to initialize components");
         goto cleanup;
     }
@@ -269,9 +273,11 @@ int main(int argc, char* argv[]) {
     log_message("INFO", port_msg);
     
     // Initialize WebRTC server
-    if (webrtc_server_initialize(webrtc_server, device)) {
+    #ifdef ENABLE_WEBRTC
+    if (webrtc_server && webrtc_server_initialize(webrtc_server, device)) {
         log_message("INFO", "WebRTC server initialized");
     }
+    #endif
     
     // Set HTTP server callbacks
     http_server_set_metrics_callback(http_server, metrics_callback_wrapper);
@@ -371,9 +377,6 @@ int main(int argc, char* argv[]) {
                                     strncpy(metrics->last_motion_time, get_current_time(), 
                                            sizeof(metrics->last_motion_time) - 1);
                                 }
-                                
-                                printf("Motion detected! Level: %.2f, Changed pixels: %u\n", 
-                                       result.motion_level, result.changed_pixels);
                             }
                         }
                     } else {
@@ -428,16 +431,8 @@ cleanup:
     }
     
     if (http_server) {
-        http_server_stop(http_server);
         http_server_destroy(http_server);
     }
-    
-    if (webrtc_server) {
-        webrtc_server_stop(webrtc_server);
-        webrtc_server_destroy(webrtc_server);
-    }
-    
-    printf("Smart Monitor stopped\n");
     
     return 0;
 }

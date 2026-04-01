@@ -31,7 +31,6 @@ i2c_sensor_t* i2c_create_mock(void) {
     i2c_sensor_t* sensor = i2c_create("/mock/i2c", 0x48);
     if (sensor) {
         sensor->initialized = true;
-        printf("Mock I2C sensor created\n");
     }
     return sensor;
 }
@@ -57,7 +56,6 @@ bool i2c_initialize(i2c_sensor_t* sensor) {
     }
     
     sensor->initialized = true;
-    printf("I2C sensor initialized: %s (0x%02X)\n", sensor->device_path, sensor->device_addr);
     return true;
 }
 
@@ -125,7 +123,6 @@ bool i2c_write_register(i2c_sensor_t* sensor, uint8_t reg, uint8_t value) {
     }
     
     if (sensor->fd < 0) {
-        printf("Mock I2C write: reg 0x%02X = 0x%02X\n", reg, value);
         return true;
     }
     

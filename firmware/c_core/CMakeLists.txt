@@ -133,12 +133,13 @@ install(TARGETS smart_monitor
 )
 
 # Install configuration file
-install(FILES ${CMAKE_SOURCE_DIR}/config/smartmonitor.conf
-    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}
-)
+if(EXISTS ${CMAKE_SOURCE_DIR}/config/smartmonitor.conf)
+    install(FILES ${CMAKE_SOURCE_DIR}/config/smartmonitor.conf
+        DESTINATION etc)
+endif()
 
 # Install systemd service
-if(WITH_SYSTEMD)
+if(WITH_SYSTEMD AND EXISTS ${CMAKE_SOURCE_DIR}/systemd/smartmonitor.service)
     install(FILES ${CMAKE_SOURCE_DIR}/systemd/smartmonitor.service
-        DESTINATION ${CMAKE_INSTALL_SYSTEMD_USER_UNITDIR})
+        DESTINATION lib/systemd/user)
 endif()
