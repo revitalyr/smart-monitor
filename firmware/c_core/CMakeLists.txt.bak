@@ -95,11 +95,6 @@ if(WITH_SYSTEMD)
 endif()
 
 target_link_libraries(smart_monitor ${LINK_LIBS})
-
-# Include directories
-target_include_directories(smart_monitor PRIVATE
-    ${GST_INCLUDE_DIRS}
-    ${GST_APP_INCLUDE_DIRS}
     ${GST_VIDEO_INCLUDE_DIRS}
 )
 
@@ -111,34 +106,4 @@ target_compile_options(smart_monitor PRIVATE
     -Wall
     -Wextra
     -O2
-    -D_GNU_SOURCE
 )
-
-# Conditional defines
-if(ENABLE_MOCK)
-    target_compile_definitions(smart_monitor PRIVATE ENABLE_MOCK)
-endif()
-
-if(ENABLE_AUDIO)
-    target_compile_definitions(smart_monitor PRIVATE ENABLE_AUDIO)
-endif()
-
-if(ENABLE_SENSORS)
-    target_compile_definitions(smart_monitor PRIVATE ENABLE_SENSORS)
-endif()
-
-# Installation
-install(TARGETS smart_monitor
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
-
-# Install configuration file
-install(FILES ${CMAKE_SOURCE_DIR}/config/smartmonitor.conf
-    DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}
-)
-
-# Install systemd service
-if(WITH_SYSTEMD)
-    install(FILES ${CMAKE_SOURCE_DIR}/systemd/smartmonitor.service
-        DESTINATION ${CMAKE_INSTALL_SYSTEMD_USER_UNITDIR})
-endif()

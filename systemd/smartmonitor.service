@@ -1,0 +1,39 @@
+[Unit]
+Description=SmartMonitor - Embedded Video Analytics System
+Documentation=https://github.com/smart-monitor
+After=network.target sound.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/smart_monitor --config /etc/smartmonitor.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+User=root
+Group=root
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/smartmonitor /tmp /dev/video0 /dev/i2c-1
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=64
+MemoryMax=100M
+
+# Environment
+Environment=SMART_MONITOR_CONFIG=/etc/smartmonitor.conf
+Environment=SMART_MONITOR_LOG_LEVEL=INFO
+Environment=RUST_LOG=info
+
+# Capabilities for camera and sensor access
+CapabilityBoundingSet=CAP_SYS_RAWIO CAP_SYS_ADMIN
+AmbientCapabilities=CAP_SYS_RAWIO CAP_SYS_ADMIN
+
+[Install]
+WantedBy=multi-user.target
+Alias=smartmonitor.service

@@ -1,20 +1,171 @@
 #include "video/v4l2_capture.h"
 #include "video/gstreamer_pipeline.h"
-#include "ffi/rust_bridge.h"
 #include "net/http_server.h"
 #include "net/webrtc_server.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 #include <unistd.h>
+#include <signal.h>
 #include <time.h>
-#include <pthread.h>
+#include <stdbool.h>
+#include <getopt.h>
 
-volatile sig_atomic_t running = 1;
+#include "video/v4l2_capture.h"
+#include "net/http_server.h"
+#include "net/webrtc_server.h"
+#include "ffi/rust_bridge.h"
+
+#define DEFAULT_PORT 8080
+#define DEFAULT_DEVICE "/dev/video0"
+#define DEFAULT_WIDTH 640
+#define DEFAULT_HEIGHT 480
+
+typedef struct {
+    char* device;
+    int port;
+    bool mock_mode;
+    bool debug_mode;
+    char* log_file;
+    bool syslog_mode;
+    char* config_file;
+} config_t;
+
+static volatile bool running = true;
+static config_t config = {
+    .device = DEFAULT_DEVICE,
+    .port = DEFAULT_PORT,
+    .mock_mode = false,
+    .debug_mode = false,
+    .log_file = NULL,
+    .syslog_mode = false,
+    .config_file = "/etc/smartmonitor.conf"
+};
 
 void signal_handler(int sig) {
-    running = 0;
+    (void)sig;
+    printf("\nShutting down Smart Monitor...\n");
+    running = false;
+}
+
+void print_usage(const char* program_name) {
+    printf("Usage: %s [OPTIONS]\n", program_name);
+    printf("Smart Monitor - Embedded Video Analytics System\n\n");
+    printf("Options:\n");
+    printf("  -d, --device DEVICE    Camera device (default: %s)\n", DEFAULT_DEVICE);
+    printf("  -p, --port PORT        HTTP port (default: %d)\n", DEFAULT_PORT);
+    printf("  -m, --mock           Enable mock mode (no camera required)\n");
+    printf("  -D, --debug           Enable debug output\n");
+    printf("  -l, --log-file FILE  Log to file\n");
+    printf("  -s, --syslog         Enable syslog output\n");
+    printf("  -c, --config FILE     Configuration file (default: /etc/smartmonitor.conf)\n");
+    printf("  -h, --help           Show this help message\n");
+    printf("\nExamples:\n");
+    printf("  %s                           # Use default camera\n", program_name);
+    printf("  %s --mock                    # Mock mode for testing\n", program_name);
+    printf("  %s --device /dev/video1 --port 8081\n", program_name);
+    printf("  %s --debug --log-file /var/log/smartmonitor.log\n", program_name);
+}
+
+void parse_arguments(int argc, char* argv[]) {
+    static struct option long_options[] = {
+        {"device", required_argument, 0, 'd'},
+        {"port", required_argument, 0, 'p'},
+        {"mock", no_argument, 0, 'm'},
+        {"debug", no_argument, 0, 'D'},
+        {"log-file", required_argument, 0, 'l'},
+        {"syslog", no_argument, 0, 's'},
+        {"config", required_argument, 0, 'c'},
+        {"help", no_argument, 0, 'h'},
+        {0, 0, 0, 0}
+    };
+
+    int option_index = 0;
+    int c;
+
+    while ((c = getopt_long(argc, argv, "d:p:MDl:sc:h", long_options, &option_index)) != -1) {
+        switch (c) {
+            case 'd':
+                config.device = strdup(optarg);
+                break;
+            case 'p':
+                config.port = atoi(optarg);
+                break;
+            case 'm':
+                config.mock_mode = true;
+                break;
+            case 'D':
+                config.debug_mode = true;
+                break;
+            case 'l':
+                config.log_file = strdup(optarg);
+                break;
+            case 's':
+                config.syslog_mode = true;
+                break;
+            case 'c':
+                config.config_file = strdup(optarg);
+                break;
+            case 'h':
+                print_usage(argv[0]);
+                exit(EXIT_SUCCESS);
+            case '?':
+                fprintf(stderr, "Unknown option. Use -h for help.\n");
+                exit(EXIT_FAILURE);
+            default:
+                abort();
+        }
+    }
+}
+
+void load_config_file() {
+    FILE* file = fopen(config.config_file, "r");
+    if (!file) {
+        if (config.debug_mode) {
+            printf("Config file %s not found, using defaults\n", config.config_file);
+        }
+        return;
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        if (line[0] == '#' || line[0] == '\n') continue;
+        
+        char* key = strtok(line, "=");
+        char* value = strtok(NULL, "\n");
+        
+        if (key && value) {
+            if (strcmp(key, "device") == 0) {
+                config.device = strdup(value);
+            } else if (strcmp(key, "port") == 0) {
+                config.port = atoi(value);
+            } else if (strcmp(key, "mock_mode") == 0) {
+                config.mock_mode = (strcmp(value, "true") == 0);
+            } else if (strcmp(key, "debug") == 0) {
+                config.debug_mode = (strcmp(value, "true") == 0);
+            }
+        }
+    }
+    fclose(file);
+}
+
+void log_message(const char* level, const char* message) {
+    time_t now = time(NULL);
+    char timestamp[64];
+    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    
+    if (config.log_file) {
+        FILE* log = fopen(config.log_file, "a");
+        if (log) {
+            fprintf(log, "[%s] %s: %s\n", timestamp, level, message);
+            fclose(log);
+        }
+    } else if (config.syslog_mode) {
+        // syslog integration would go here
+        printf("[%s] %s: %s\n", timestamp, level, message);
+    } else {
+        printf("[%s] %s: %s\n", timestamp, level, message);
+    }
 }
 
 char* get_current_time(void) {
@@ -59,49 +210,67 @@ char* webrtc_callback_wrapper(void) {
     );
 }
 
-int main(void) {
+int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    parse_arguments(argc, argv);
+    
+    // Load configuration file
+    load_config_file();
+    
+    // Setup logging
+    if (config.debug_mode) {
+        log_message("DEBUG", "Smart Monitor starting in debug mode");
+    }
+    
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     
-    printf("Smart Monitor starting...\n");
+    log_message("INFO", "Smart Monitor starting...");
     
     time_t start_time = time(NULL);
     
-    // Initialize components
-    v4l2_capture_t* camera = v4l2_create("/dev/video0");
+    // Initialize components with config
+    const char* device = config.mock_mode ? NULL : config.device;
+    v4l2_capture_t* camera = v4l2_create(device);
     rust_motion_detector_t* motion_detector = rust_detector_create();
-    http_server_t* http_server = http_server_create(8080);
-    webrtc_server_t* webrtc_server = webrtc_server_create("/dev/video0");
+    http_server_t* http_server = http_server_create(config.port);
+    webrtc_server_t* webrtc_server = webrtc_server_create(device);
     
     if (!camera || !motion_detector || !http_server || !webrtc_server) {
-        fprintf(stderr, "Failed to initialize components\n");
+        log_message("ERROR", "Failed to initialize components");
         goto cleanup;
     }
     
     // Initialize camera
-    if (!v4l2_initialize(camera, 640, 480)) {
-        printf("Failed to initialize camera, using mock mode\n");
+    if (!v4l2_initialize(camera, DEFAULT_WIDTH, DEFAULT_HEIGHT)) {
+        if (config.mock_mode) {
+            log_message("INFO", "Mock mode enabled");
+        } else {
+            log_message("WARNING", "Failed to initialize camera, using mock mode");
+        }
     } else {
-        printf("Camera initialized successfully\n");
+        log_message("INFO", "Camera initialized successfully");
     }
     
     // Initialize motion detector
     if (!rust_detector_initialize(motion_detector)) {
-        fprintf(stderr, "Failed to initialize motion detector\n");
+        log_message("ERROR", "Failed to initialize motion detector");
         goto cleanup;
     }
     
     // Start HTTP server
     if (!http_server_start(http_server)) {
-        fprintf(stderr, "Failed to start HTTP server\n");
+        log_message("ERROR", "Failed to start HTTP server");
         goto cleanup;
     }
     
-    printf("HTTP server started on port 8080\n");
+    char port_msg[64];
+    snprintf(port_msg, sizeof(port_msg), "HTTP server started on port %d", config.port);
+    log_message("INFO", port_msg);
     
     // Initialize WebRTC server
-    if (webrtc_server_initialize(webrtc_server, "/dev/video0")) {
-        printf("WebRTC server initialized\n");
+    if (webrtc_server_initialize(webrtc_server, device)) {
+        log_message("INFO", "WebRTC server initialized");
     }
     
     // Set HTTP server callbacks
