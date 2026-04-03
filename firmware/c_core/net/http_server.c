@@ -19,6 +19,8 @@
 #define API_SENSORS_I2C "/sensors/i2c"
 #define API_SENSORS_IMU "/sensors/imu"
 #define API_SENSORS_CALIBRATE "/sensors/calibrate"
+#define API_ESP32_COMMAND "/esp32/command"
+#define API_ESP32_BLE_TOGGLE "/esp32/ble/toggle"
 #define API_ESP32_TOGGLE "/esp32/toggle"
 #define API_ESP32_STATUS "/esp32/status"
 #define API_SLEEP_SCORE "/sleep/score"
@@ -36,6 +38,9 @@ struct http_server {
     bool m_running;
     pthread_t m_server_thread;
     
+    audio_toggle_callback_t m_audio_toggle_callback;
+    i2c_toggle_callback_t m_i2c_toggle_callback;
+    uart_command_callback_t m_uart_command_callback;
     metrics_data_t m_metrics;
     
     metrics_callback_t m_metrics_callback;
@@ -58,6 +63,7 @@ static const char* get_mime_type(const char* path) {
 }
 
 static void send_response(file_fd_t fd, const char* status, const char* content_type, const char* body, size_t body_len, const char* cache_control);
+static void send_enhanced_html(file_fd_t fd);
 
 http_server_t* http_server_create(port_t port) {
     http_server_t* server = malloc(sizeof(http_server_t));
@@ -183,6 +189,18 @@ void http_server_set_audio_toggle_callback(http_server_t* server, audio_toggle_c
     }
 }
 
+void http_server_set_i2c_toggle_callback(http_server_t* server, i2c_toggle_callback_t callback) {
+    if (server) {
+        server->m_i2c_toggle_callback = callback;
+    }
+}
+
+void http_server_set_uart_command_callback(http_server_t* server, uart_command_callback_t callback) {
+    if (server) {
+        server->m_uart_command_callback = callback;
+    }
+}
+
 metrics_data_t* http_server_get_metrics(http_server_t* server) {
     return server ? &server->m_metrics : NULL;
 }
@@ -288,11 +306,16 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
         send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
     }
     else if (strstr(buffer, "POST " API_SENSORS_I2C_TOGGLE)) {
-        static bool s_i2c_enabled = true;
-        s_i2c_enabled = !s_i2c_enabled;
-        char response[100];
-        snprintf(response, sizeof(response), "{\"i2c_enabled\":%s}", s_i2c_enabled ? "true" : "false");
-        send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+        if (server->m_i2c_toggle_callback) {
+            static bool s_i2c_enabled = true;
+            s_i2c_enabled = !s_i2c_enabled;
+            server->m_i2c_toggle_callback(s_i2c_enabled);
+            char response[100];
+            snprintf(response, sizeof(response), "{\"i2c_enabled\":%s}", s_i2c_enabled ? "true" : "false");
+            send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+        } else {
+            send_response(client_fd, "500 Error", "text/plain", "I2C callback not set", 18, "no-cache");
+        }
     }
     else if (strstr(buffer, "POST " API_SENSORS_CALIBRATE)) {
         // Generic sensor calibration
@@ -333,6 +356,40 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
         s_esp32_enabled = !s_esp32_enabled;
         char response[100];
         snprintf(response, sizeof(response), "{\"connected\":%s}", s_esp32_enabled ? "true" : "false");
+        send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+    }
+    else if (strstr(buffer, "POST " API_ESP32_COMMAND)) {
+        char* body = strstr(buffer, "\r\n\r\n");
+        if (body && server->m_uart_command_callback) {
+            body += 4;
+            // Простой поиск "command":"значение" в JSON теле
+            char* cmd_key = strstr(body, "\"command\"");
+            if (cmd_key) {
+                char* start = strchr(cmd_key + 9, '\"');
+                if (start) {
+                    start++;
+                    char* end = strchr(start, '\"');
+                    if (end) {
+                        *end = '\0';
+                        server->m_uart_command_callback(start);
+                        
+                        char response[256];
+                        snprintf(response, sizeof(response), "{\"status\":\"sent\",\"command\":\"%s\"}", start);
+                        *end = '\"'; // Восстанавливаем буфер
+                        send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+                        return;
+                    }
+                }
+            }
+        }
+        const char* err = "{\"error\":\"invalid_request\",\"details\":\"Missing command field\"}";
+        send_response(client_fd, "400 Bad Request", "application/json", err, strlen(err), "no-cache");
+    }
+    else if (strstr(buffer, "POST " API_ESP32_BLE_TOGGLE)) {
+        static bool s_ble_active = false;
+        s_ble_active = !s_ble_active;
+        char response[100];
+        snprintf(response, sizeof(response), "{\"ble_active\":%s}", s_ble_active ? "true" : "false");
         send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
     }
     else if (strstr(buffer, "GET " API_ESP32_STATUS)) {
@@ -454,7 +511,7 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
         }
     }
     else if (strstr(buffer, "OPTIONS")) {
-        send_response(client_fd, "200 OK", "text/plain", "", 0);
+        send_response(client_fd, "200 OK", "text/plain", "", 0, NULL);
     }
     else if (path[0] == '/' && strlen(path) > 1 && strchr(path, '.')) {
         // Try to serve static files (CSS/JS/etc)
@@ -502,7 +559,7 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
             if (html_content) {
                 size_t bytes_read = fread(html_content, 1, file_size, html_file);
                 html_content[bytes_read] = '\0';
-                send_response(client_fd, "200 OK", "text/html", html_content, file_size);
+                send_response(client_fd, "200 OK", "text/html", html_content, file_size, "no-cache");
                 free(html_content);
             }
             fclose(html_file);
@@ -1055,7 +1112,7 @@ static void send_enhanced_html(file_fd_t fd) {
     dprintf(fd, "%s", html_content);
 }
 
-static void send_response(file_fd_t fd, const char* status, const char* content_type, const char* body, size_t body_len) {
+static void send_response(file_fd_t fd, const char* status, const char* content_type, const char* body, size_t body_len, const char* cache_control) {
     char header[512];
     int header_len = snprintf(header, sizeof(header),
         "HTTP/1.1 %s\r\n"
@@ -1064,9 +1121,10 @@ static void send_response(file_fd_t fd, const char* status, const char* content_
         "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"
         "Content-Type: %s\r\n"
         "Content-Length: %lu\r\n"
+        "Cache-Control: %s\r\n"
         "Connection: close\r\n"
         "\r\n",
-        status, content_type, (unsigned long)body_len);
+        status, content_type, (unsigned long)body_len, cache_control ? cache_control : "no-cache");
     
     send(fd, header, header_len, 0);
     if (body && body_len > 0) {

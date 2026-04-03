@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include "audio_capture.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,10 +98,8 @@ int audio_read_samples(audio_capture_t* audio, uint8_t* buffer, int size) {
     // Mock implementation - generate simulated audio
     if (audio->fd == -1) {
         audio_generate_mock_samples(audio, buffer, size);
-        return size;
     }
     
-    // Real ALSA implementation would go here
     return size;
 }
 

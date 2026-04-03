@@ -1,3 +1,9 @@
+/**
+ * @file http_server.h
+ * @brief Minimalistic HTTP server for API and telemetry.
+ * 
+ * Handles REST requests and serves binary metrics to the frontend.
+ */
 #ifndef HTTP_SERVER_H
 #define HTTP_SERVER_H
 
@@ -9,6 +15,17 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @struct metrics_data_t
+ * @brief Legacy structure for JSON metrics reporting.
+ */
+typedef char* (*metrics_callback_t)(void);
+typedef char* (*health_callback_t)(void);
+typedef char* (*webrtc_callback_t)(void);
+typedef void (*uart_command_callback_t)(const char* command);
+typedef void (*i2c_toggle_callback_t)(bool enable);
+typedef void (*audio_toggle_callback_t)(bool enable);
 
 typedef struct {
     motion_events_count_t m_motion_events;
@@ -26,11 +43,6 @@ typedef struct {
     size_t size;
 } http_response_t;
 
-// Callback function types
-typedef char* (*metrics_callback_t)(void);
-typedef char* (*health_callback_t)(void);
-typedef char* (*webrtc_callback_t)(void);
-
 // Functions
 http_server_t* http_server_create(port_t port);
 void http_server_destroy(http_server_t* server);
@@ -42,6 +54,8 @@ bool http_server_is_running(const http_server_t* server);
 void http_server_set_metrics_callback(http_server_t* server, metrics_callback_t callback);
 void http_server_set_health_callback(http_server_t* server, health_callback_t callback);
 void http_server_set_webrtc_callback(http_server_t* server, webrtc_callback_t callback);
+void http_server_set_uart_command_callback(http_server_t* server, uart_command_callback_t callback);
+void http_server_set_i2c_toggle_callback(http_server_t* server, i2c_toggle_callback_t callback);
 
 metrics_data_t* http_server_get_metrics(http_server_t* server);
 

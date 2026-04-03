@@ -7,6 +7,7 @@
 typedef struct {
     int fd;
     bool initialized;
+    bool capturing;
     int sample_rate;
     int channels;
     int buffer_size;

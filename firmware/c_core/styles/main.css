@@ -1,0 +1,146 @@
+/* Smart Monitor CSS Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1a1a;
+    color: #ffffff;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    font-size: 2.5em;
+    color: #00ff00;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 1.2em;
+    color: #888;
+}
+
+.navigation {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+    gap: 10px;
+}
+
+.nav-btn {
+    padding: 12px 24px;
+    background: #333;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.nav-btn:hover {
+    background: #555;
+}
+
+.nav-btn.active {
+    background: #00ff00;
+    color: #000;
+}
+
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+.dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.card {
+    background: #2a2a2a;
+    border-radius: 10px;
+    padding: 20px;
+    border: 1px solid #444;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.card h3 {
+    margin-bottom: 15px;
+    color: #00ff00;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.icon {
+    font-size: 1.2em;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.online { background: #00ff00; }
+.status-dot.offline { background: #ff0000; }
+.status-dot.alert { background: #ff9900; }
+
+.chart-container {
+    height: 300px;
+    margin-top: 15px;
+}
+
+.log-container {
+    background: #1a1a1a;
+    border-radius: 6px;
+    padding: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.log-entry {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    margin-bottom: 5px;
+    padding: 4px 8px;
+    border-radius: 3px;
+}
+
+.log-info { background: #1a3a1a; }
+.log-warning { background: #3a2a1a; }
+.log-error { background: #4a1a1a; }
+
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    .dashboard {
+        grid-template-columns: 1fr;
+    }
+    
+    .navigation {
+        flex-wrap: wrap;
+    }
+}

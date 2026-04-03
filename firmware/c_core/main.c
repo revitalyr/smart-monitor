@@ -1,3 +1,10 @@
+/**
+ * @file main.c
+ * @brief Entry point for the Smart Monitor system.
+ * 
+ * This file initializes all hardware components, starts the network services,
+ * and runs the main processing loop for video and sensor data.
+ */
 #include "video/v4l2_capture.h"
 #include "net/http_server.h"
 #include "net/webrtc_server.h"
@@ -35,31 +42,33 @@
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 480
 
-// Бинарный протокол для общения с Web UI
+/**
+ * @struct monitor_packet_t
+ * @brief Binary protocol structure for Web UI communication.
+ * 
+ * This packed structure contains all telemetry data sent from the agent
+ * to the frontend.
+ */
 #pragma pack(push, 1)
 typedef struct {
-    uint32_t magic;           // 0x534D4F4E ('SMON')
-    uint32_t uptime_secs;
+    uint32_t magic;           /**< Protocol identifier: 0x534D4F4E ('SMON') */
+    uint32_t uptime_secs;     /**< System uptime in seconds */
     
-    // Видео и движение
-    uint32_t motion_events;
-    float    motion_level;
-    uint32_t frames_processed;
-    float    frame_processing_latency_ms; // New field for latency
-    uint8_t  camera_active;
+    uint32_t motion_events;   /**< Total count of detected motion events */
+    float    motion_level;    /**< Current intensity of motion (0.0 - 1.0) */
+    uint32_t frames_processed; /**< Total video frames processed */
+    float    frame_processing_latency_ms; /**< Time taken to process the last frame */
+    uint8_t  camera_active;   /**< Flag indicating if camera capture is running */
 
-    // Сенсоры I2C
-    float    temp;
-    float    humidity;
-    uint16_t light;
-    uint8_t  motion_detected;
+    float    temp;            /**< I2C Temperature sensor reading (°C) */
+    float    humidity;        /**< I2C Humidity sensor reading (%) */
+    uint16_t light;           /**< I2C Ambient light level (Lux) */
+    uint8_t  motion_detected; /**< I2C PIR sensor motion detection flag */
 
-    // IMU данные (SPI)
-    int16_t  acc_x, acc_y, acc_z;
+    int16_t  acc_x, acc_y, acc_z; /**< SPI Accelerometer raw data */
     
-    // Аудио данные
-    float    audio_level;
-    uint8_t  audio_alert;
+    float    audio_level;     /**< RMS audio noise level */
+    uint8_t  audio_alert;     /**< Flag indicating significant noise detection (e.g. baby crying) */
 
     // Данные от ESP32 (UART/BLE)
     float    esp32_temp;
@@ -72,6 +81,10 @@ typedef struct {
 } monitor_packet_t;
 #pragma pack(pop)
 
+/**
+ * @struct config_t
+ * @brief System runtime configuration parameters.
+ */
 typedef struct {
     char* device;
     port_t m_port;
@@ -90,6 +103,30 @@ static time_t g_start_time;
 static bool g_audio_capture_enabled = true; // Global state for audio capture
 #endif
 
+#ifdef ENABLE_SENSORS
+static bool g_i2c_sensors_enabled = true; // Global state for I2C sensors
+#endif
+
+#ifdef ENABLE_SENSORS
+static uart_interface_t* g_uart = NULL;
+
+static void main_uart_command_callback(const char* command) {
+    if (g_uart && command) {
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Forwarding to UART: %s", command);
+        uart_log_message(g_uart, "INFO", msg);
+        uart_write(g_uart, command, strlen(command));
+        uart_write(g_uart, "\r\n", 2); // Конец команды
+    }
+}
+#endif
+
+/**
+ * @brief Global configuration object.
+ * 
+ * Initialized with default values and updated via command line arguments
+ * or configuration file.
+ */
 static config_t config = {
     .device = DEFAULT_DEVICE,
     .m_port = DEFAULT_PORT,
@@ -100,6 +137,12 @@ static config_t config = {
     .m_config_file = "/etc/smartmonitor.conf"
 };
 
+/**
+ * @brief Checks if a network port is already being used.
+ * 
+ * @param port The port number to check.
+ * @return true if the port is busy, false otherwise.
+ */
 bool is_port_in_use(port_t port) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) return false;
@@ -115,6 +158,12 @@ bool is_port_in_use(port_t port) {
     return (result == -1) && (errno == EADDRINUSE);
 }
 
+/**
+ * @brief Sends a shutdown request to an already running instance of the agent.
+ * 
+ * Used to ensure only one instance runs per port.
+ * @param port The port of the instance to shutdown.
+ */
 void shutdown_existing_instance(port_t port) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) return;
@@ -134,6 +183,11 @@ void shutdown_existing_instance(port_t port) {
     close(sock);
 }
 
+/**
+ * @brief Signal handler for graceful shutdown.
+ * 
+ * @param sig The signal received (SIGINT or SIGTERM).
+ */
 void signal_handler(int sig) {
     (void)sig;
     printf("\nShutting down Smart Monitor...\n");
@@ -144,12 +198,22 @@ void signal_handler(int sig) {
     signal(SIGTERM, signal_handler);
 }
 
+/**
+ * @brief Alarm handler for forced process exit.
+ * 
+ * @param sig The SIGALRM signal.
+ */
 void alarm_handler(int sig) {
     (void)sig;
     printf("Alarm triggered. Forcing shutdown...\n");
     running = false;
 }
 
+/**
+ * @brief Prints CLI usage help to stdout.
+ * 
+ * @param program_name The name of the binary.
+ */
 void print_usage(const char* program_name) {
     printf("Usage: %s [OPTIONS]\n", program_name);
     printf("Smart Monitor - Embedded Video Analytics System\n\n");
@@ -169,6 +233,12 @@ void print_usage(const char* program_name) {
     printf("  %s --debug --log-file /var/log/smartmonitor.log\n", program_name);
 }
 
+/**
+ * @brief Parses command line arguments using getopt_long.
+ * 
+ * @param argc Argument count.
+ * @param argv Argument vector.
+ */
 void parse_arguments(int argc, char* argv[]) {
     static struct option long_options[] = {
         {"device", required_argument, 0, 'd'},
@@ -220,6 +290,11 @@ void parse_arguments(int argc, char* argv[]) {
     }
 }
 
+/**
+ * @brief Loads system configuration from a file.
+ * 
+ * Parses key=value pairs and ignores comments.
+ */
 void load_config_file() {
     FILE* file = fopen(config.m_config_file, "r");
     if (!file) {
@@ -251,25 +326,48 @@ void load_config_file() {
     fclose(file);
 }
 
-void log_message(const char* level, const char* message) {
-    time_t now = time(NULL);
-    char timestamp[64];
-    strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
-    
-    if (config.m_log_file) {
-        FILE* log = fopen(config.m_log_file, "a");
-        if (log) {
-            fprintf(log, "[%s] %s: %s\n", timestamp, level, message);
-            fclose(log);
-        }
-    } else if (config.m_syslog_mode) {
-        // syslog integration would go here
-        printf("[%s] %s: %s\n", timestamp, level, message);
-    } else {
-        printf("[%s] %s: %s\n", timestamp, level, message);
+/**
+ * @brief Saves current state and configuration to a file.
+ * 
+ * Persists audio and sensor states across reboots.
+ */
+void save_config_file() {
+    FILE* file = fopen(config.m_config_file, "w");
+    if (!file) {
+        char err_msg[256];
+        snprintf(err_msg, sizeof(err_msg), "Failed to save config to %s", config.m_config_file);
+        perror("Failed to save config");
+        return;
     }
+
+    fprintf(file, "# Smart Monitor Auto-saved Configuration\n");
+    fprintf(file, "device=%s\n", config.device ? config.device : DEFAULT_DEVICE);
+    fprintf(file, "port=%d\n", config.m_port);
+    fprintf(file, "mock_mode=%s\n", config.m_mock_mode ? "true" : "false");
+    fprintf(file, "debug=%s\n", config.m_debug_mode ? "true" : "false");
+
+#ifdef ENABLE_AUDIO
+    fprintf(file, "enable_audio=%s\n", g_audio_capture_enabled ? "true" : "false");
+#endif
+#ifdef ENABLE_SENSORS
+    fprintf(file, "enable_sensors=%s\n", g_i2c_sensors_enabled ? "true" : "false");
+#endif
+
+    fclose(file);
+    uart_log_message(g_uart, "INFO", "System state saved to config file");
 }
 
+/**
+ * @brief Thread-safe logging function.
+ * 
+ * @param level Severity level (INFO, DEBUG, ERROR).
+ * @param message The message to log.
+ */
+/**
+ * @brief Returns current system time as a formatted string.
+ * 
+ * @return A pointer to a static buffer containing the time string.
+ */
 char* get_current_time(void) {
     static char time_str[32];
     time_t now = time(NULL);
@@ -278,6 +376,12 @@ char* get_current_time(void) {
     return time_str;
 }
 
+/**
+ * @brief Calculates system uptime since start_time.
+ * 
+ * @param start_time The time point when the system started.
+ * @return A pointer to a static buffer containing formatted uptime (h m s).
+ */
 char* calculate_uptime(time_t start_time) {
     static char uptime_str[32];
     time_t now = time(NULL);
@@ -291,6 +395,12 @@ char* calculate_uptime(time_t start_time) {
     return uptime_str;
 }
 
+/**
+ * @brief Reads system usage from /proc filesystem.
+ * 
+ * @param cpu Pointer to store CPU usage percentage.
+ * @param mem Pointer to store Memory usage percentage.
+ */
 static void update_system_info(uint8_t *cpu, uint8_t *mem) {
     // Расчет использования RAM через /proc/meminfo
     FILE *fp = fopen("/proc/meminfo", "r");
@@ -333,6 +443,13 @@ static void update_system_info(uint8_t *cpu, uint8_t *mem) {
     }
 }
 
+/**
+ * @brief Callback for the HTTP server to fetch binary metrics.
+ * 
+ * Updates the current telemetry packet and returns a copy.
+ * @return char* Cast pointer to the binary monitor_packet_t structure.
+ * @note The HTTP server is responsible for freeing the returned memory.
+ */
 char* metrics_callback_wrapper(void) {
     // Обновляем системные показатели перед отправкой пакета
     update_system_info(&g_current_packet.cpu_usage, &g_current_packet.mem_usage);
@@ -352,16 +469,38 @@ char* metrics_callback_wrapper(void) {
 static audio_capture_t* audio_capture_instance = NULL; // Global audio instance
 static noise_detector_t* noise_detector_instance = NULL; // Global noise detector instance
 
+/**
+ * @brief Toggles audio capture on or off.
+ * 
+ * @param enable true to start capture, false to stop.
+ */
 static void main_audio_toggle_callback(bool enable) {
     g_audio_capture_enabled = enable;
     if (enable) {
-        if (audio_capture_instance && !audio_is_capturing(audio_capture_instance)) audio_start_capture(audio_capture_instance);
+        if (audio_capture_instance && audio_is_capturing(audio_capture_instance)) audio_start_capture(audio_capture_instance);
     } else {
         if (audio_capture_instance && audio_is_capturing(audio_capture_instance)) audio_stop_capture(audio_capture_instance);
     }
 }
 #endif
 
+#ifdef ENABLE_SENSORS
+/**
+ * @brief Toggles I2C sensor polling.
+ * 
+ * @param enable true to enable sensor reads.
+ */
+static void main_i2c_toggle_callback(bool enable) {
+    g_i2c_sensors_enabled = enable;
+    uart_log_message(g_uart, "INFO", enable ? "I2C Sensors enabled" : "I2C Sensors disabled");
+}
+#endif
+
+/**
+ * @brief Callback for health check endpoint.
+ * 
+ * @return char* String status "OK".
+ */
 char* health_callback_wrapper(void) {
     return strdup("OK");
 }
@@ -400,14 +539,14 @@ int main(int argc, char* argv[]) {
     
     // Setup logging
     if (config.m_debug_mode) {
-        log_message("DEBUG", "Smart Monitor starting in debug mode");
+        printf("DEBUG: Smart Monitor starting in debug mode\n");
     }
     
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     signal(SIGALRM, alarm_handler);
     
-    log_message("INFO", "Smart Monitor starting...");
+    printf("INFO: Smart Monitor starting...\n");
     
     g_start_time = time(NULL);
     
@@ -415,17 +554,17 @@ int main(int argc, char* argv[]) {
     const char* device = config.m_mock_mode ? NULL : config.device;
     v4l2_capture_t* camera = v4l2_create(device);
     if (!camera) {
-        log_message("ERROR", "Failed to create camera");
+        perror("Failed to create camera");
     }
     
     rust_motion_detector_t* motion_detector = rust_detector_create();
     if (!motion_detector) {
-        log_message("ERROR", "Failed to create motion detector");
+        perror("Failed to create motion detector");
     }
     
     http_server_t* http_server = http_server_create(config.m_port);
     if (!http_server) {
-        log_message("ERROR", "Failed to create HTTP server");
+        perror("Failed to create HTTP server");
     }
     
     // Initialize WebRTC server (optional)
@@ -435,47 +574,47 @@ int main(int argc, char* argv[]) {
     #endif
     
     if (!camera || !motion_detector || !http_server) {
-        log_message("ERROR", "Failed to initialize components");
+        fprintf(stderr, "ERROR: Failed to initialize components\n");
         goto cleanup;
     }
     
     // Initialize camera
     if (!v4l2_initialize(camera, DEFAULT_WIDTH, DEFAULT_HEIGHT)) {
         if (config.m_mock_mode) {
-            log_message("INFO", "Mock mode enabled");
+            printf("INFO: Mock mode enabled\n");
         } else {
-            log_message("WARNING", "Failed to initialize camera, using mock mode");
+            printf("WARNING: Failed to initialize camera, using mock mode\n");
         }
     } else {
-        log_message("INFO", "Camera initialized successfully");
+        printf("INFO: Camera initialized successfully\n");
     }
     
     // Initialize motion detector
     if (!rust_detector_initialize(motion_detector)) {
         if (config.m_mock_mode) {
-            log_message("INFO", "Mock mode: motion detector initialization skipped");
+            printf("INFO: Mock mode: motion detector initialization skipped\n");
         } else {
-            log_message("ERROR", "Failed to initialize motion detector");
+            fprintf(stderr, "ERROR: Failed to initialize motion detector\n");
             goto cleanup;
         }
     } else {
-        log_message("INFO", "Motion detector initialized successfully");
+        printf("INFO: Motion detector initialized successfully\n");
     }
     
     // Start HTTP server
     if (!http_server_start(http_server)) {
-        log_message("ERROR", "Failed to start HTTP server");
+        fprintf(stderr, "ERROR: Failed to start HTTP server\n");
         goto cleanup;
     }
     
     char port_msg[64];
     snprintf(port_msg, sizeof(port_msg), "HTTP server started on port %d", config.m_port);
-    log_message("INFO", port_msg);
+    printf("INFO: %s\n", port_msg);
     
     // Initialize WebRTC server
     #ifdef ENABLE_WEBRTC
     if (webrtc_server && webrtc_server_initialize(webrtc_server, device)) {
-        log_message("INFO", "WebRTC server initialized");
+        printf("INFO: WebRTC server initialized\n");
     }
     #endif
     
@@ -484,12 +623,12 @@ int main(int argc, char* argv[]) {
     audio_capture_t* audio = audio_create_mock();
     if (audio && audio_initialize(audio, 44100, 1)) {
         audio_start_capture(audio);
-        log_message("INFO", "Audio capture initialized");
+        printf("INFO: Audio capture initialized\n");
     }
     
     noise_detector_t* noise_detector = noise_detector_create(44100);
     if (noise_detector && noise_detector_initialize(noise_detector)) {
-        log_message("INFO", "Noise detection initialized");
+        printf("INFO: Noise detection initialized\n");
     }
     #endif
     
@@ -497,31 +636,31 @@ int main(int argc, char* argv[]) {
     // I2C sensor
     i2c_sensor_t* i2c_sensor = i2c_create_mock();
     if (i2c_sensor && i2c_initialize(i2c_sensor)) {
-        log_message("INFO", "I2C sensor initialized");
+        printf("INFO: I2C sensor initialized\n");
     }
     
     // SPI device (IMU)
     spi_device_t* spi_device = spi_create_mock();
     if (spi_device && spi_initialize(spi_device, 0, 1000000)) {
-        log_message("INFO", "SPI IMU device initialized");
+        printf("INFO: SPI IMU device initialized\n");
     }
     
     // UART interface
-    uart_interface_t* uart = uart_create_mock();
-    if (uart && uart_initialize(uart, 115200)) {
-        log_message("INFO", "UART interface initialized");
+    g_uart = uart_create_mock();
+    if (g_uart && uart_initialize(g_uart, 115200)) {
+        printf("INFO: UART interface initialized\n");
     }
     
     // ESP32 device
     esp32_device_t* esp32 = esp32_create_mock();
     if (esp32 && esp32_initialize(esp32, 115200)) {
         if (esp32_connect(esp32)) {
-            log_message("INFO", "ESP32 device connected");
+            printf("INFO: ESP32 device connected\n");
         }
     }
     #endif
     
-    log_message("INFO", "All components initialized");
+    printf("INFO: All components initialized\n");
     
     // Start camera capture
     if (v4l2_is_initialized(camera)) {
@@ -592,7 +731,7 @@ int main(int argc, char* argv[]) {
                     if (gray_size > 0 && gray_size <= 1000000) { // 1MB limit
                         // Ensure detector is initialized
                         if (!rust_detector_initialize(motion_detector)) {
-                            log_message("ERROR", "Failed to initialize motion detector before detection");
+                            uart_log_message(g_uart, "ERROR", "Failed to initialize motion detector before detection");
                         } else {
                             // Add signal handler for safety
                             signal(SIGSEGV, signal_handler);
@@ -644,13 +783,12 @@ int main(int argc, char* argv[]) {
                                     uint32_t current_time = time(NULL);
                                     
                                     if (noise_metrics.m_baby_crying_detected && (current_time - last_alert_time) > 30) {
-                                        log_message("ALERT", "Baby crying detected!");
+                                        uart_log_message(g_uart, "ALERT", "Baby crying detected!");
                                         last_alert_time = current_time;
                                         g_current_packet.audio_alert = 1;
                                     }
                                     if (noise_metrics.m_screaming_detected && (current_time - last_alert_time) > 30) {
-                                        log_message("ALERT", "Screaming detected!");
-                                        last_alert_time = current_time;
+                                        uart_log_message(g_uart, "ALERT", "Screaming detected!");
                                     }
                                 }
                             }
@@ -662,7 +800,7 @@ int main(int argc, char* argv[]) {
                             sensor_counter++;
                             
                             // I2C sensor reading
-                            if (i2c_sensor && sensor_counter % 100 == 0) {
+                            if (i2c_sensor && g_i2c_sensors_enabled && sensor_counter % 100 == 0) {
                                 sensor_data_t sensor_data = i2c_read_sensor_data(i2c_sensor);
                                 g_current_packet.temp = sensor_data.temperature;
                                 g_current_packet.humidity = sensor_data.humidity;
@@ -702,14 +840,14 @@ int main(int argc, char* argv[]) {
                                 
                                 
                                 // Send data via UART
-                                if (uart) {
-                                    uart_log_message(uart, "DATA", esp32_msg);
+                                if (g_uart) {
+                                    uart_log_message(g_uart, "DATA", esp32_msg);
                                 }
                             }
                             
                             // UART command processing
-                            if (uart && sensor_counter % 300 == 0) {
-                                uart_process_commands(uart);
+                            if (g_uart && sensor_counter % 300 == 0) {
+                                uart_process_commands(g_uart);
                             }
                             #endif
                         }
@@ -758,6 +896,8 @@ int main(int argc, char* argv[]) {
 cleanup:
     printf("\nShutting down Smart Monitor...\n");
     
+    save_config_file();
+
     if (camera) {
         v4l2_destroy(camera);
     }
@@ -768,6 +908,10 @@ cleanup:
     if (motion_detector) {
         rust_detector_destroy(motion_detector);
     }
+
+#ifdef ENABLE_SENSORS
+    if (g_uart) uart_destroy(g_uart);
+#endif
     
     if (http_server) {
         http_server_destroy(http_server);
