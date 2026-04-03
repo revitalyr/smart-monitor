@@ -64,6 +64,22 @@ void data_agent_set_motion_threshold(data_agent_t* agent, float threshold);
 void data_agent_set_audio_threshold(data_agent_t* agent, float threshold);
 void data_agent_set_update_interval(data_agent_t* agent, uint32_t interval_ms);
 
+// HTTP server JSON callbacks
+void data_agent_set_http_callbacks(data_agent_t* agent, 
+                                   char* (*sensor_cb)(void),
+                                   char* (*audio_cb)(void),
+                                   char* (*system_cb)(void));
+
+// Get JSON data functions
+char* data_agent_get_sensor_json(data_agent_t* agent);
+char* data_agent_get_audio_json(data_agent_t* agent);
+char* data_agent_get_system_json(data_agent_t* agent);
+
+// JSON generator functions (extern for main.c)
+char* generate_sensor_json(void);
+char* generate_audio_json(void);
+char* generate_system_json(void);
+
 #ifdef __cplusplus
 }
 #endif

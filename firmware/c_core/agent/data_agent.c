@@ -32,6 +32,11 @@ struct data_agent {
     void* motion_user_data;
     void* status_user_data;
     
+    // HTTP server JSON callbacks
+    char* (*sensor_json_callback)(void);
+    char* (*audio_json_callback)(void);
+    char* (*system_json_callback)(void);
+    
     // Internal state
     uint32_t sequence;
     uint8_t* prev_frame;
@@ -428,6 +433,123 @@ static void generate_realistic_audio_data(audio_data_t* data) {
     static const int freq_range[] = {200, 300, 500, 600, 800, 1000, 2000, 250};
     int si = (int)g_sim.state;
     data->peak_frequency = (uint16_t)(freq_min[si] + (rand() % freq_range[si]));
+}
+
+// ---------------------------------------------------------------------------
+// JSON callback functions for HTTP server
+// ---------------------------------------------------------------------------
+char* generate_sensor_json(void) {
+    sensor_data_t data = {0};
+    generate_realistic_sensor_data(&data);
+    
+    char* json = malloc(256);
+    if (json) {
+        snprintf(json, 256, 
+            "{\"temperature\":%.1f,\"humidity\":%.1f,\"light\":%d,\"motion\":%s}",
+            data.temperature, data.humidity, data.light_level, 
+            data.motion_detected ? "true" : "false");
+    }
+    return json;
+}
+
+char* generate_audio_json(void) {
+    audio_data_t data = {0};
+    generate_realistic_audio_data(&data);
+    
+    char* json = malloc(256);
+    if (json) {
+        snprintf(json, 256,
+            "{\"enabled\":true,\"capturing\":true,\"noise_level\":%.3f,\"voice_activity\":%s,\"baby_crying\":%s,\"screaming\":%s,\"peak_frequency\":%d}",
+            data.noise_level, data.voice_activity ? "true" : "false", 
+            data.baby_crying ? "true" : "false", data.screaming ? "true" : "false",
+            data.peak_frequency);
+    }
+    return json;
+}
+
+char* generate_system_json(void) {
+    char* json = malloc(256);
+    if (json) {
+        static uint32_t uptime = 0;
+        uptime += 100;
+        
+        snprintf(json, 256,
+            "{\"uptime\":%d,\"cpu_usage\":%.1f,\"memory_usage\":%.1f,\"temperature\":%.1f,\"baby_state\":\"%s\"}",
+            uptime, 15.0f + (rand() % 100) / 100.0f, 25.0f + (rand() % 200) / 100.0f,
+            35.0f + (rand() % 100) / 100.0f, get_state_name(g_sim.state));
+    }
+    return json;
+}
+
+// ---------------------------------------------------------------------------
+// Видео JSON — отдаёт данные для Canvas-визуализации на фронтенде.
+// Содержит: состояние ребёнка, вероятность движения, уровень шума,
+// флаг motion_detected (уже скоррелирован — опережает аудио на ~0.5 с),
+// активность ночника и текущую освещённость.
+// ---------------------------------------------------------------------------
+char* generate_video_json(void) {
+    char* json = malloc(512);
+    if (!json) return NULL;
+
+    // motion_detected: порог 0.12 — детектор срабатывает раньше аудио
+    bool motion_detected = g_sim.smooth_motion_prob > 0.12f;
+    // audio_triggered: порог 0.18 — срабатывает позже (~0.5–1 с)
+    bool audio_triggered = g_sim.smooth_noise > 0.18f;
+
+    snprintf(json, 512,
+        "{"
+        "\"baby_state\":\"%s\","
+        "\"motion_prob\":%.3f,"
+        "\"noise_level\":%.3f,"
+        "\"motion_detected\":%s,"
+        "\"audio_triggered\":%s,"
+        "\"nightlight\":%s,"
+        "\"light_lux\":%d,"
+        "\"room_temp\":%.1f,"
+        "\"body_temp\":%.2f,"
+        "\"humidity\":%.1f"
+        "}",
+        get_state_name(g_sim.state),
+        g_sim.smooth_motion_prob,
+        g_sim.smooth_noise,
+        motion_detected  ? "true" : "false",
+        audio_triggered  ? "true" : "false",
+        g_sim.nightlight_on ? "true" : "false",
+        g_sim.light_lux,
+        g_sim.room_temp,
+        g_sim.body_temp,
+        g_sim.humidity);
+
+    return json;
+}
+
+// ---------------------------------------------------------------------------
+// Public API for setting callbacks
+// ---------------------------------------------------------------------------
+void data_agent_set_http_callbacks(data_agent_t* agent, 
+                                   char* (*sensor_cb)(void),
+                                   char* (*audio_cb)(void),
+                                   char* (*system_cb)(void)) {
+    if (!agent) return;
+    
+    agent->sensor_json_callback = sensor_cb;
+    agent->audio_json_callback = audio_cb;
+    agent->system_json_callback = system_cb;
+}
+
+char* data_agent_get_sensor_json(data_agent_t* agent) {
+    if (!agent || !agent->sensor_json_callback) return NULL;
+    return agent->sensor_json_callback();
+}
+
+char* data_agent_get_audio_json(data_agent_t* agent) {
+    if (!agent || !agent->audio_json_callback) return NULL;
+    return agent->audio_json_callback();
+}
+
+char* data_agent_get_system_json(data_agent_t* agent) {
+    if (!agent || !agent->system_json_callback) return NULL;
+    return agent->system_json_callback();
 }
 
 // Worker thread function

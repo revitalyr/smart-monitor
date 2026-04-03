@@ -46,6 +46,9 @@ struct http_server {
     metrics_callback_t m_metrics_callback;
     health_callback_t m_health_callback;
     webrtc_callback_t m_webrtc_callback;
+    sensor_json_callback_t m_sensor_data_callback;
+    audio_json_callback_t m_audio_data_callback;
+    system_json_callback_t m_system_data_callback;
 };
 
 static void* server_loop(void* arg);
@@ -201,6 +204,24 @@ void http_server_set_uart_command_callback(http_server_t* server, uart_command_c
     }
 }
 
+void http_server_set_sensor_data_callback(http_server_t* server, sensor_json_callback_t callback) {
+    if (server) {
+        server->m_sensor_data_callback = callback;
+    }
+}
+
+void http_server_set_audio_data_callback(http_server_t* server, audio_json_callback_t callback) {
+    if (server) {
+        server->m_audio_data_callback = callback;
+    }
+}
+
+void http_server_set_system_data_callback(http_server_t* server, system_json_callback_t callback) {
+    if (server) {
+        server->m_system_data_callback = callback;
+    }
+}
+
 metrics_data_t* http_server_get_metrics(http_server_t* server) {
     return server ? &server->m_metrics : NULL;
 }
@@ -285,17 +306,29 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
         }
     }
     else if (strstr(buffer, "GET " API_AUDIO_STATUS)) {
-        // Return real audio status with noise level
-        char response[200];
-        noise_level_t noise_level = AUDIO_NOISE_LEVEL_MIN + (noise_level_t)(rand() % 100) / 1000.0f;
-        bool voice_activity = (rand() % 100) > 70;
-        bool baby_crying = (rand() % 100) > 95;
-        bool screaming = (rand() % 100) > 98;
-        
-        snprintf(response, sizeof(response), 
-            "{\"enabled\":true,\"capturing\":true,\"noise_level\":%.3f,\"voice_activity\":%s,\"baby_crying\":%s,\"screaming\":%s}",
-            noise_level, voice_activity ? "true" : "false", baby_crying ? "true" : "false", screaming ? "true" : "false"); // Mock data
-        send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+        // Return real audio data from data agent
+        if (server->m_audio_data_callback) {
+            char* response = server->m_audio_data_callback();
+            if (response) {
+                send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+                free(response);
+            } else {
+                const char* err = "{\"error\":\"audio_data_unavailable\"}";
+                send_response(client_fd, "503 Service Unavailable", "application/json", err, strlen(err), "no-cache");
+            }
+        } else {
+            // Fallback to mock data if callback not set
+            char response[200];
+            noise_level_t noise_level = AUDIO_NOISE_LEVEL_MIN + (noise_level_t)(rand() % 100) / 1000.0f;
+            bool voice_activity = (rand() % 100) > 70;
+            bool baby_crying = (rand() % 100) > 95;
+            bool screaming = (rand() % 100) > 98;
+            
+            snprintf(response, sizeof(response), 
+                "{\"enabled\":true,\"capturing\":true,\"noise_level\":%.3f,\"voice_activity\":%s,\"baby_crying\":%s,\"screaming\":%s}",
+                noise_level, voice_activity ? "true" : "false", baby_crying ? "true" : "false", screaming ? "true" : "false");
+            send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+        }
     }
     // Sensor endpoints
     else if (strstr(buffer, "POST " API_SENSORS_TOGGLE)) {
@@ -323,17 +356,29 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
         send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
     }
     else if (strstr(buffer, "GET " API_SENSORS_I2C)) {
-        // Return real I2C sensor data
-        char response[200];
-        temperature_c_t temperature = I2C_SENSOR_TEMP_MIN + (temperature_c_t)(rand() % (int)(I2C_SENSOR_TEMP_MAX - I2C_SENSOR_TEMP_MIN));
-        humidity_percent_t humidity = I2C_SENSOR_HUMIDITY_MIN + (humidity_percent_t)(rand() % (int)(I2C_SENSOR_HUMIDITY_MAX - I2C_SENSOR_HUMIDITY_MIN));
-        light_lux_t light = I2C_SENSOR_LIGHT_MIN + rand() % (I2C_SENSOR_LIGHT_MAX - I2C_SENSOR_LIGHT_MIN);
-        bool motion = (rand() % 100) > 80;
-        
-        snprintf(response, sizeof(response), 
-            "{\"temperature\":%.1f,\"humidity\":%.1f,\"light\":%d,\"motion\":%s}",
-            temperature, humidity, light, motion ? "true" : "false"); // Mock data
-        send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+        // Return real I2C sensor data from data agent
+        if (server->m_sensor_data_callback) {
+            char* response = server->m_sensor_data_callback();
+            if (response) {
+                send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+                free(response);
+            } else {
+                const char* err = "{\"error\":\"sensor_data_unavailable\"}";
+                send_response(client_fd, "503 Service Unavailable", "application/json", err, strlen(err), "no-cache");
+            }
+        } else {
+            // Fallback to mock data if callback not set
+            char response[200];
+            temperature_c_t temperature = I2C_SENSOR_TEMP_MIN + (temperature_c_t)(rand() % (int)(I2C_SENSOR_TEMP_MAX - I2C_SENSOR_TEMP_MIN));
+            humidity_percent_t humidity = I2C_SENSOR_HUMIDITY_MIN + (humidity_percent_t)(rand() % (int)(I2C_SENSOR_HUMIDITY_MAX - I2C_SENSOR_HUMIDITY_MIN));
+            light_lux_t light = I2C_SENSOR_LIGHT_MIN + rand() % (I2C_SENSOR_LIGHT_MAX - I2C_SENSOR_LIGHT_MIN);
+            bool motion = (rand() % 100) > 80;
+            
+            snprintf(response, sizeof(response), 
+                "{\"temperature\":%.1f,\"humidity\":%.1f,\"light\":%d,\"motion\":%s}",
+                temperature, humidity, light, motion ? "true" : "false");
+            send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+        }
     }
     else if (strstr(buffer, "GET " API_SENSORS_IMU)) {
         // Return real IMU data
@@ -424,18 +469,30 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
         send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
     }
     else if (strstr(buffer, "GET " API_SYSTEM_STATUS)) {
-        // Return real system status
-        char response[200];
-        static uptime_seconds_t s_uptime_counter = 0;
-        s_uptime_counter += rand() % 10;
-        cpu_usage_percent_t cpu_usage = SYSTEM_CPU_MIN + (cpu_usage_percent_t)(rand() % (int)(SYSTEM_CPU_MAX - SYSTEM_CPU_MIN));
-        memory_usage_percent_t memory_usage = SYSTEM_MEMORY_MIN + (memory_usage_percent_t)(rand() % (int)(SYSTEM_MEMORY_MAX - SYSTEM_MEMORY_MIN));
-        temperature_c_t temperature = SYSTEM_TEMP_MIN + (temperature_c_t)(rand() % (int)(SYSTEM_TEMP_MAX - SYSTEM_TEMP_MIN));
-        
-        snprintf(response, sizeof(response), 
-            "{\"uptime\":%d,\"cpu_usage\":%.1f,\"memory_usage\":%.1f,\"temperature\":%.1f}",
-            s_uptime_counter, cpu_usage, memory_usage, temperature); // Mock data
-        send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+        // Return real system data from data agent
+        if (server->m_system_data_callback) {
+            char* response = server->m_system_data_callback();
+            if (response) {
+                send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+                free(response);
+            } else {
+                const char* err = "{\"error\":\"system_data_unavailable\"}";
+                send_response(client_fd, "503 Service Unavailable", "application/json", err, strlen(err), "no-cache");
+            }
+        } else {
+            // Fallback to mock data if callback not set
+            char response[200];
+            static uptime_seconds_t s_uptime_counter = 0;
+            s_uptime_counter += rand() % 10;
+            cpu_usage_percent_t cpu_usage = SYSTEM_CPU_MIN + (cpu_usage_percent_t)(rand() % (int)(SYSTEM_CPU_MAX - SYSTEM_CPU_MIN));
+            memory_usage_percent_t memory_usage = SYSTEM_MEMORY_MIN + (memory_usage_percent_t)(rand() % (int)(SYSTEM_MEMORY_MAX - SYSTEM_MEMORY_MIN));
+            temperature_c_t temperature = SYSTEM_TEMP_MIN + (temperature_c_t)(rand() % (int)(SYSTEM_TEMP_MAX - SYSTEM_TEMP_MIN));
+            
+            snprintf(response, sizeof(response), 
+                "{\"uptime\":%d,\"cpu_usage\":%.1f,\"memory_usage\":%.1f,\"temperature\":%.1f}",
+                s_uptime_counter, cpu_usage, memory_usage, temperature);
+            send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+        }
     }
     else if (strstr(buffer, "POST " API_ANALYZE_VIDEO)) {
         // Video analysis endpoint

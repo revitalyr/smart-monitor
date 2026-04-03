@@ -22,6 +22,11 @@
 #include "../../web/http_server.h"
 #include "common/smart_monitor_constants.h"
 
+// Forward declarations for data agent JSON generators
+extern char* generate_sensor_json(void);
+extern char* generate_audio_json(void);
+extern char* generate_system_json(void);
+
 // Global instances
 static data_agent_t* g_data_agent = NULL;
 static protocol_server_t* g_protocol_server = NULL;
@@ -59,17 +64,24 @@ static void print_usage(const char* program_name) {
 
 // HTTP API handlers - these bridge to the data agent
 static char* http_sensor_handler(void) {
-    // This would fetch real data from the data agent
-    // For now, return a placeholder
-    return strdup("{\"temperature\":22.5,\"humidity\":45.2,\"light\":350,\"motion\":false}");
+    if (g_data_agent) {
+        return data_agent_get_sensor_json(g_data_agent);
+    }
+    return strdup("{\"error\":\"data_agent_not_available\"}");
 }
 
 static char* http_audio_handler(void) {
-    return strdup("{\"noise_level\":0.15,\"voice_activity\":false,\"baby_crying\":false,\"screaming\":false}");
+    if (g_data_agent) {
+        return data_agent_get_audio_json(g_data_agent);
+    }
+    return strdup("{\"error\":\"data_agent_not_available\"}");
 }
 
 static char* http_system_handler(void) {
-    return strdup("{\"cpu_usage\":25,\"memory_usage\":45,\"fps\":30,\"frames_processed\":1000,\"uptime\":3600}");
+    if (g_data_agent) {
+        return data_agent_get_system_json(g_data_agent);
+    }
+    return strdup("{\"error\":\"data_agent_not_available\"}");
 }
 
 int main(int argc, char* argv[]) {
@@ -206,9 +218,15 @@ int main(int argc, char* argv[]) {
     }
     
     // Set HTTP handlers
-    http_server_set_metrics_callback(g_http_server, http_system_handler);
-    http_server_set_health_callback(g_http_server, http_sensor_handler);
-    // TODO: Add more handlers as needed
+    http_server_set_sensor_data_callback(g_http_server, http_sensor_handler);
+    http_server_set_audio_data_callback(g_http_server, http_audio_handler);
+    http_server_set_system_data_callback(g_http_server, http_system_handler);
+    
+    // Initialize data agent HTTP callbacks
+    data_agent_set_http_callbacks(g_data_agent, 
+                                  generate_sensor_json, 
+                                  generate_audio_json, 
+                                  generate_system_json);
     
     printf("HTTP server created successfully\n");
     

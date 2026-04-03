@@ -9,3 +9,12 @@
 Влажность растёт при активности — через накопленный humidity_delta, вентилируется с τ=60 с.
 Ночник — включается автоматически при CRYING_LOUD/SCREAMING (имитация реакции родителя), гаснет через 30 с после успокоения. light_lux в норме ≈3, с ночником ≈40.
 Аудио-детектор с false negative — baby_crying иногда (~10%) пропускает реальный плач, screaming — ~5%, что реалистично для классификаторов.
+
+data_agent.c — новая функция generate_video_json(), которую нужно подключить к HTTP-серверу по маршруту /video/status. Отдаёт: baby_state, motion_prob, noise_level, motion_detected, audio_triggered, nightlight, light_lux, room_temp, body_temp, humidity. Пороги детекции намеренно разные — motion_detected срабатывает при motion_prob > 0.12, audio_triggered при noise_level > 0.18, что воспроизводит задержку ~0.5–1 с из физической модели.
+
+Ключевые корреляции в рендерере:
+Параметр        Источник                Задержка    Покачивание фигурки
+motion_prob → _smooth.motion            Ampα=0.12   (быстро)Свечение контура
+noise_level → _smooth.noise             Glowα=0.06  (медленнее)Рамка детекции
+motion_detected / audio_triggeredкак в C-коде
+Яркость сцены   light_lux + nightlight  α=0.05

@@ -4,6 +4,14 @@
 let isAnalyzing = false;
 let dataChannel = null;
 
+// в app.js
+import { initVideoRenderer } from './video_renderer.js';
+
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('videoCanvas');
+    initVideoRenderer(canvas); // запускается автоматически, без Start
+});
+
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Smart Monitor application initialized');
