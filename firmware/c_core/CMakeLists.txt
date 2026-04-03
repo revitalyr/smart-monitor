@@ -49,10 +49,19 @@ endif()
 
 # Add executable with conditional sources
 set(SOURCES
-    main.c
+    main_new.c
     video/v4l2_capture.c
     ffi/rust_bridge.c
-    net/http_server.c
+    ${CMAKE_SOURCE_DIR}/web/http_server.c
+    ${CMAKE_SOURCE_DIR}/web/protocol_server.c
+    agent/data_agent.c
+    common/smart_monitor_protocol.c
+    audio/audio_capture.c
+    audio/noise_detection.c
+    sensors/i2c_sensor.c
+    sensors/spi_device.c
+    comm/uart_interface.c
+    esp32/esp32_device.c
 )
 
 # Conditional source additions
@@ -158,21 +167,21 @@ install(TARGETS smart_monitor
 # Copy HTML interface to build directory
 add_custom_command(TARGET smart_monitor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_SOURCE_DIR}/firmware/c_core/web_interface_enhanced.html
-    ${CMAKE_BINARY_DIR}/firmware/c_core/web_interface_enhanced.html
-    COMMENT "Copying HTML interface to build directory"
+    ${CMAKE_SOURCE_DIR}/web/static/dashboard.html
+    ${CMAKE_BINARY_DIR}/firmware/c_core/static/dashboard.html
+    COMMENT "Copying HTML dashboard to build directory"
 )
 
 # Copy static web assets to build directory
 add_custom_command(TARGET smart_monitor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
-    ${CMAKE_BINARY_DIR}/firmware/c_core/styles
-    COMMENT "Creating styles directory"
+    ${CMAKE_BINARY_DIR}/firmware/c_core/static
+    COMMENT "Creating static directory"
 )
 add_custom_command(TARGET smart_monitor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_SOURCE_DIR}/firmware/c_core/styles/main.css
-    ${CMAKE_BINARY_DIR}/firmware/c_core/styles/main.css
+    ${CMAKE_SOURCE_DIR}/web/static/main.css
+    ${CMAKE_BINARY_DIR}/firmware/c_core/static/main.css
     COMMENT "Copying main.css to build directory"
 )
 add_custom_command(TARGET smart_monitor POST_BUILD
@@ -182,13 +191,13 @@ add_custom_command(TARGET smart_monitor POST_BUILD
 )
 add_custom_command(TARGET smart_monitor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_SOURCE_DIR}/firmware/c_core/scripts/app.js
+    ${CMAKE_SOURCE_DIR}/web/scripts/app.js
     ${CMAKE_BINARY_DIR}/firmware/c_core/scripts/app.js
     COMMENT "Copying app.js to build directory"
 )
 add_custom_command(TARGET smart_monitor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_SOURCE_DIR}/firmware/c_core/scripts/charts.js
+    ${CMAKE_SOURCE_DIR}/web/scripts/charts.js
     ${CMAKE_BINARY_DIR}/firmware/c_core/scripts/charts.js
     COMMENT "Copying charts.js to build directory"
 )

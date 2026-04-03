@@ -1,5 +1,5 @@
 #include "http_server.h"
-#include "../common/smart_monitor_constants.h"
+#include "../firmware/c_core/common/smart_monitor_constants.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -535,11 +535,9 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
         // Serve HTML interface from file - try multiple paths
         FILE* html_file = NULL;
         const char* paths[] = {
-            "firmware/c_core/web_interface_enhanced.html",
-            "./firmware/c_core/web_interface_enhanced.html", 
-            "../firmware/c_core/web_interface_enhanced.html",
-            "web_interface_enhanced.html",
-            "./web_interface_enhanced.html",
+            "firmware/c_core/static/dashboard.html",
+            "./firmware/c_core/static/dashboard.html",
+            "../firmware/c_core/static/dashboard.html",
             NULL
         };
         
@@ -564,8 +562,9 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
             }
             fclose(html_file);
         } else {
-            // Serve the enhanced SPA interface directly
-            send_enhanced_html(client_fd);
+            // File not found - send error response
+            const char* error_msg = "<html><body><h1>Dashboard not found</h1><p>Please check file paths.</p></body></html>";
+            send_response(client_fd, "404 Not Found", "text/html", error_msg, strlen(error_msg), NULL);
         }
     }
 }

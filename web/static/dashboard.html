@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Monitor - Real-time Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🎯 Smart Monitor</h1>
+            <p>Real-time IoT Monitoring Dashboard</p>
+        </header>
+        
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="connectionStatus"></div>
+                <span id="connectionText">Disconnected</span>
+            </div>
+            <div class="connection-info">
+                <span id="protocolInfo">Protocol: Not Connected</span>
+            </div>
+            <div class="connection-info">
+                <span id="updateRate">Update Rate: -- Hz</span>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <!-- Environmental Sensors -->
+            <div class="card">
+                <h3>🌡️ Environmental Sensors</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <div class="metric-value" id="temperature">--</div>
+                        <div class="metric-label">Temperature (°C)</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="humidity">--</div>
+                        <div class="metric-label">Humidity (%)</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="lightLevel">--</div>
+                        <div class="metric-label">Light Level</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="motionStatus">--</div>
+                        <div class="metric-label">Motion</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Audio Analysis -->
+            <div class="card">
+                <h3>🎵 Audio Analysis</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <div class="metric-value" id="noiseLevel">--</div>
+                        <div class="metric-label">Noise Level</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="voiceActivity">--</div>
+                        <div class="metric-label">Voice Activity</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="babyCrying">--</div>
+                        <div class="metric-label">Baby Crying</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="screaming">--</div>
+                        <div class="metric-label">Screaming</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="audioChart"></canvas>
+                </div>
+                <div class="alert" id="audioAlert"></div>
+            </div>
+            
+            <!-- Video Monitoring -->
+            <div class="card">
+                <h3>📹 Video Monitoring</h3>
+                <div class="video-container" id="videoContainer">
+                    <span>Video Feed - No Connection</span>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-primary" id="startBtn">Start Analysis</button>
+                    <button class="btn btn-danger" id="stopBtn" disabled>Stop Analysis</button>
+                    <button class="btn btn-primary" id="snapshotBtn">Snapshot</button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="motionChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- System Status -->
+            <div class="card">
+                <h3>⚙️ System Status</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <div class="metric-value" id="cpuUsage">--</div>
+                        <div class="metric-label">CPU Usage (%)</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="memoryUsage">--</div>
+                        <div class="metric-label">Memory Usage (%)</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="fps">--</div>
+                        <div class="metric-label">FPS</div>
+                    </div>
+                    <div>
+                        <div class="metric-value" id="uptime">--</div>
+                        <div class="metric-label">Uptime</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="systemChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Protocol client for binary communication
+        class ProtocolClient {
+            constructor(port) {
+                this.port = port;
+                this.ws = null;
+                this.connected = false;
+                this.updateCallbacks = [];
+                this.sequence = 0;
+                this.lastUpdateTime = 0;
+                this.updateCount = 0;
+            }
+            
+            connect() {
+                // For now, we'll use HTTP polling as fallback
+                // In a real implementation, this would use WebSocket with binary protocol
+                console.log(`Protocol client connecting to port ${this.port}`);
+                this.connected = true;
+                this.startPolling();
+                return true;
+            }
+            
+            disconnect() {
+                this.connected = false;
+                if (this.pollingInterval) {
+                    clearInterval(this.pollingInterval);
+                }
+            }
+            
+            startPolling() {
+                this.pollingInterval = setInterval(() => {
+                    if (this.connected) {
+                        this.updateMetrics();
+                    }
+                }, 100); // 10 Hz update rate
+            }
+            
+            updateMetrics() {
+                // Simulate binary protocol data via HTTP endpoints
+                Promise.all([
+                    fetch('/sensors/i2c').then(r => r.json()),
+                    fetch('/audio/status').then(r => r.json()),
+                    fetch('/system/status').then(r => r.json())
+                ]).then(([sensorData, audioData, systemData]) => {
+                    this.updateCount++;
+                    this.lastUpdateTime = Date.now();
+                    
+                    // Notify all callbacks
+                    this.updateCallbacks.forEach(callback => {
+                        callback({
+                            sensor: sensorData,
+                            audio: audioData,
+                            system: systemData,
+                            timestamp: this.lastUpdateTime
+                        });
+                    });
+                }).catch(error => {
+                    console.error('Error updating metrics:', error);
+                });
+            }
+            
+            onUpdate(callback) {
+                this.updateCallbacks.push(callback);
+            }
+            
+            sendCommand(command, target, parameter, value) {
+                // In real implementation, this would send binary protocol message
+                console.log(`Command: ${command}, Target: ${target}, Param: ${parameter}, Value: ${value}`);
+                
+                // For now, use HTTP API
+                fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command, target, parameter, value })
+                }).catch(error => {
+                    console.error('Error sending command:', error);
+                });
+            }
+        }
+        
+        // Initialize protocol client
+        const protocolClient = new ProtocolClient(8081);
+        
+        // Chart instances
+        let audioChart, motionChart, systemChart;
+        
+        // Initialize charts
+        function initCharts() {
+            // Audio chart
+            const audioCtx = document.getElementById('audioChart').getContext('2d');
+            audioChart = new Chart(audioCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Noise Level',
+                        data: [],
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, max: 1 }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+            
+            // Motion chart
+            const motionCtx = document.getElementById('motionChart').getContext('2d');
+            motionChart = new Chart(motionCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Motion Level',
+                        data: [],
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, max: 1 }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+            
+            // System chart
+            const systemCtx = document.getElementById('systemChart').getContext('2d');
+            systemChart = new Chart(systemCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'CPU',
+                            data: [],
+                            borderColor: '#dc3545',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Memory',
+                            data: [],
+                            borderColor: '#ffc107',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, max: 100 }
+                    }
+                }
+            });
+        }
+        
+        // Update display with real data
+        function updateDisplay(data) {
+            // Update connection status
+            const statusDot = document.getElementById('connectionStatus');
+            const connectionText = document.getElementById('connectionText');
+            const protocolInfo = document.getElementById('protocolInfo');
+            
+            statusDot.classList.add('connected');
+            connectionText.textContent = 'Connected';
+            protocolInfo.textContent = `Protocol: Connected (Port ${protocolClient.port})`;
+            
+            // Calculate update rate
+            const updateRate = protocolClient.updateCount > 0 ? 
+                (protocolClient.updateCount / ((Date.now() - protocolClient.lastUpdateTime) / 1000)).toFixed(1) : '--';
+            document.getElementById('updateRate').textContent = `Update Rate: ${updateRate} Hz`;
+            
+            // Update sensor data
+            if (data.sensor) {
+                document.getElementById('temperature').textContent = data.sensor.temperature.toFixed(1);
+                document.getElementById('humidity').textContent = data.sensor.humidity.toFixed(1);
+                document.getElementById('lightLevel').textContent = data.sensor.light;
+                document.getElementById('motionStatus').textContent = data.sensor.motion ? 'YES' : 'NO';
+            }
+            
+            // Update audio data
+            if (data.audio) {
+                document.getElementById('noiseLevel').textContent = data.audio.noise_level.toFixed(3);
+                document.getElementById('voiceActivity').textContent = data.audio.voice_activity ? 'ACTIVE' : 'QUIET';
+                document.getElementById('babyCrying').textContent = data.audio.baby_crying ? 'YES' : 'NO';
+                document.getElementById('screaming').textContent = data.audio.screaming ? 'YES' : 'NO';
+                
+                // Check for alerts
+                const audioAlert = document.getElementById('audioAlert');
+                if (data.audio.baby_crying || data.audio.screaming) {
+                    audioAlert.textContent = data.audio.baby_crying ? '🚨 Baby Crying Detected!' : '🚨 Screaming Detected!';
+                    audioAlert.classList.add('show');
+                } else {
+                    audioAlert.classList.remove('show');
+                }
+                
+                // Update audio chart
+                if (audioChart) {
+                    audioChart.data.labels.push('');
+                    audioChart.data.datasets[0].data.push(data.audio.noise_level);
+                    if (audioChart.data.labels.length > 20) {
+                        audioChart.data.labels.shift();
+                        audioChart.data.datasets[0].data.shift();
+                    }
+                    audioChart.update('none');
+                }
+            }
+            
+            // Update system data
+            if (data.system) {
+                document.getElementById('cpuUsage').textContent = data.system.cpu_usage;
+                document.getElementById('memoryUsage').textContent = data.system.memory_usage;
+                document.getElementById('fps').textContent = data.system.fps;
+                
+                const uptimeHours = Math.floor(data.system.uptime / 3600);
+                const uptimeMinutes = Math.floor((data.system.uptime % 3600) / 60);
+                document.getElementById('uptime').textContent = `${uptimeHours}h ${uptimeMinutes}m`;
+                
+                // Update system chart
+                if (systemChart) {
+                    systemChart.data.labels.push('');
+                    systemChart.data.datasets[0].data.push(data.system.cpu_usage);
+                    systemChart.data.datasets[1].data.push(data.system.memory_usage);
+                    if (systemChart.data.labels.length > 20) {
+                        systemChart.data.labels.shift();
+                        systemChart.data.datasets[0].data.shift();
+                        systemChart.data.datasets[1].data.shift();
+                    }
+                    systemChart.update('none');
+                }
+            }
+        }
+        
+        // Control handlers
+        document.getElementById('startBtn').addEventListener('click', () => {
+            protocolClient.sendCommand('start', 'camera', 0, 0);
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('videoContainer').innerHTML = '<span>🎥 Analysis Active</span>';
+        });
+        
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            protocolClient.sendCommand('stop', 'camera', 0, 0);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('videoContainer').innerHTML = '<span>Video Feed - Stopped</span>';
+        });
+        
+        document.getElementById('snapshotBtn').addEventListener('click', () => {
+            protocolClient.sendCommand('snapshot', 'camera', 0, 0);
+            console.log('Snapshot requested');
+        });
+        
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            
+            // Connect to protocol server
+            if (protocolClient.connect()) {
+                protocolClient.onUpdate(updateDisplay);
+                console.log('Connected to Smart Monitor protocol server');
+            } else {
+                console.error('Failed to connect to protocol server');
+                document.getElementById('connectionText').textContent = 'Connection Failed';
+            }
+        });
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            protocolClient.disconnect();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+﻿Перепишу симуляцию с физически корректной корреляцией:Check the full file structure once more for context before rewritingCheck the full file structure once more for context before rewritingТеперь создам улучшенную версию файла с полностью переработанной симуляцией:Edited 4 files, ran a commandEdited 4 files, ran a commandТеперь нужно убрать вызов старого generate_simulated_sensor_data в agent_worker_thread — он больше не существует:Viewed 2 filesViewed 2 filesХорошо — в воркере уже вызывается generate_realistic_sensor_data, а старый generate_simulated_sensor_data нигде не вызывается (он был только объявлен). Теперь добавим #include <math.h> если его нет, и проверим что fmaxf/fminf доступны:Check includesCheck includes<math.h> есть. Теперь скопируем в output:Ran a command, read a fileRan a command, read a fileВот что принципиально изменилось:
+Физическая модель вместо switch-кейсов
+Старый подход генерировал данные независимо для каждого состояния через rand(). Новый вводит единую структуру state_physics_t с целевыми значениями, к которым реальные параметры медленно стремятся через LP-фильтр первого порядка — аналог RC-цепи.
+Ключевые корреляции:
+
+Движение опережает звук — у smooth_motion_prob постоянная нарастания 0.5 с, у smooth_noise — 1 с. Видеодетектор сработает на 0.5–1 с раньше аудио, как в реальности.
+Температура воздуха как независимый триггер — room_temp дрейфует автономно. Если стало жарче 24.5°C или холоднее 18.5°C, ребёнок переходит в BABY_RESTLESS немедленно, не дожидаясь таймера. В лог идёт TOO HOT/TOO COLD.
+Тепловая инерция тела — body_temp стремится к target с τ=120 с. При плаче поднимается медленно, при успокоении так же медленно падает.
+Влажность растёт при активности — через накопленный humidity_delta, вентилируется с τ=60 с.
+Ночник — включается автоматически при CRYING_LOUD/SCREAMING (имитация реакции родителя), гаснет через 30 с после успокоения. light_lux в норме ≈3, с ночником ≈40.
+Аудио-детектор с false negative — baby_crying иногда (~10%) пропускает реальный плач, screaming — ~5%, что реалистично для классификаторов.
