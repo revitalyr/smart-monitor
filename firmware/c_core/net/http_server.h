@@ -4,18 +4,19 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include "../common/smart_monitor_constants.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct {
-    int motion_events;
-    float motion_level;
-    int frames_processed;
-    bool camera_active;
-    char last_motion_time[32];
-    char uptime[32];
+    motion_events_count_t m_motion_events;
+    motion_level_t m_motion_level;
+    frame_count_t m_frames_processed;
+    bool m_camera_active;
+    char m_last_motion_time[32];
+    char m_uptime[32];
 } metrics_data_t;
 
 typedef struct http_server http_server_t;
@@ -31,7 +32,7 @@ typedef char* (*health_callback_t)(void);
 typedef char* (*webrtc_callback_t)(void);
 
 // Functions
-http_server_t* http_server_create(int port);
+http_server_t* http_server_create(port_t port);
 void http_server_destroy(http_server_t* server);
 
 bool http_server_start(http_server_t* server);

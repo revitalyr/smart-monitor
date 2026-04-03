@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 #define ESP32_BAUDRATE 115200
 #define HEARTBEAT_TIMEOUT 5000 // 5 seconds
@@ -157,6 +158,7 @@ bool esp32_send_ble_beacon(esp32_device_t* esp32, const char* data) {
 }
 
 void esp32_simulate_sensor_data(esp32_device_t* esp32) {
+    (void)esp32; // Suppress unused parameter warning
     // This function would be called periodically to update sensor data
     // The actual simulation happens in esp32_read_sensors()
 }

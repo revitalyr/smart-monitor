@@ -14,17 +14,19 @@ static bool v4l2_configure_format(v4l2_capture_t* cap);
 static bool v4l2_init_mmap_buffers(v4l2_capture_t* cap);
 
 v4l2_capture_t* v4l2_create(const char* device) {
-    if (!device) {
-        return NULL;
-    }
-    
     v4l2_capture_t* cap = malloc(sizeof(v4l2_capture_t));
     if (!cap) {
         return NULL;
     }
     
     memset(cap, 0, sizeof(v4l2_capture_t));
-    strncpy(cap->device, device, sizeof(cap->device) - 1);
+    
+    if (device) {
+        strncpy(cap->device, device, sizeof(cap->device) - 1);
+    } else {
+        strcpy(cap->device, "mock");
+    }
+    
     cap->fd = -1;
     cap->width = 640;
     cap->height = 480;
@@ -231,7 +233,7 @@ uint8_t* v4l2_read_frame(v4l2_capture_t* cap, size_t* frame_size) {
             for (int y = 0; y < cap->height; y++) {
                 for (int x = 0; x < cap->width / 4; x++) {
                     int pixel_idx = (y * cap->width + x) * 2;
-                    if (pixel_idx < mock_size - 1) {
+                    if ((size_t)pixel_idx < mock_size - 1) {
                         // Color bar pattern
                         int bar_color = (x / (cap->width / 16)) % 4;
                         switch (bar_color) {
@@ -251,7 +253,7 @@ uint8_t* v4l2_read_frame(v4l2_capture_t* cap, size_t* frame_size) {
                     int dist = sqrt((x - ball_x) * (x - ball_x) + (y - ball_y) * (y - ball_y));
                     if (dist < ball_radius) {
                         int pixel_idx = (y * cap->width + x) * 2;
-                        if (pixel_idx < mock_size - 1) {
+                        if ((size_t)pixel_idx < mock_size - 1) {
                             // Red ball with gradient
                             int intensity = 255 - (dist * 255 / ball_radius);
                             mock_frame[pixel_idx] = intensity > 0 ? intensity : 0;

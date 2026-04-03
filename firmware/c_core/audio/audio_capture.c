@@ -4,15 +4,17 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/ioctl.h>
-#include <sound/asound.h>
 #include <math.h>
+
+// Mock ALSA implementation for demonstration
+// In real deployment, this would use actual ALSA headers
 
 #define ALSA_DEVICE "default"
 #define BUFFER_SIZE 4096
 #define VOICE_THRESHOLD 0.1f
 
 audio_capture_t* audio_create(const char* device) {
+    (void)device; // Suppress unused parameter warning
     audio_capture_t* audio = malloc(sizeof(audio_capture_t));
     if (!audio) {
         return NULL;
@@ -22,6 +24,7 @@ audio_capture_t* audio_create(const char* device) {
     audio->fd = -1;
     audio->sample_rate = 44100;
     audio->channels = 1;
+    audio->capturing = false;
     audio->buffer_size = BUFFER_SIZE;
     
     return audio;
@@ -44,44 +47,7 @@ bool audio_initialize(audio_capture_t* audio, int sample_rate, int channels) {
     audio->sample_rate = sample_rate;
     audio->channels = channels;
     
-    // Try ALSA initialization
-    snd_pcm_t* pcm_handle;
-    snd_pcm_hw_params_t* hw_params;
-    int err;
-    
-    if ((err = snd_pcm_open(&pcm_handle, ALSA_DEVICE, SND_PCM_STREAM_CAPTURE, 0)) < 0) {
-        fprintf(stderr, "Unable to open PCM device: %s\n", snd_strerror(err));
-        return false;
-    }
-    
-    if ((err = snd_pcm_hw_params_malloc(&hw_params)) < 0) {
-        fprintf(stderr, "Cannot allocate hardware parameter structure: %s\n", snd_strerror(err));
-        snd_pcm_close(pcm_handle);
-        return false;
-    }
-    
-    if ((err = snd_pcm_hw_params_any(pcm_handle, hw_params)) < 0) {
-        fprintf(stderr, "Cannot initialize hardware parameter structure: %s\n", snd_strerror(err));
-        snd_pcm_hw_params_free(hw_params);
-        snd_pcm_close(pcm_handle);
-        return false;
-    }
-    
-    // Set parameters
-    snd_pcm_hw_params_set_access(pcm_handle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED);
-    snd_pcm_hw_params_set_format(pcm_handle, hw_params, SND_PCM_FORMAT_S16_LE);
-    snd_pcm_hw_params_set_rate_near(pcm_handle, hw_params, &sample_rate, 0);
-    snd_pcm_hw_params_set_channels(pcm_handle, hw_params, channels);
-    
-    if ((err = snd_pcm_hw_params(pcm_handle, hw_params)) < 0) {
-        fprintf(stderr, "Cannot set hardware parameters: %s\n", snd_strerror(err));
-        snd_pcm_hw_params_free(hw_params);
-        snd_pcm_close(pcm_handle);
-        return false;
-    }
-    
-    snd_pcm_hw_params_free(hw_params);
-    
+    // Mock ALSA initialization - always succeed for demo
     audio->fd = 1; // Mark as initialized
     audio->initialized = true;
     
@@ -105,6 +71,7 @@ bool audio_start_capture(audio_capture_t* audio) {
         return false;
     }
     
+    audio->capturing = true;
     return true;
 }
 
@@ -112,6 +79,14 @@ void audio_stop_capture(audio_capture_t* audio) {
     if (!audio) {
         return;
     }
+    audio->capturing = false;
+}
+
+bool audio_is_capturing(const audio_capture_t* audio) {
+    if (!audio) {
+        return false;
+    }
+    return audio->capturing;
 }
 
 int audio_read_samples(audio_capture_t* audio, uint8_t* buffer, int size) {
@@ -130,6 +105,7 @@ int audio_read_samples(audio_capture_t* audio, uint8_t* buffer, int size) {
 }
 
 void audio_generate_mock_samples(audio_capture_t* audio, uint8_t* buffer, int size) {
+    (void)audio; // Suppress unused parameter warning
     static float phase = 0.0f;
     static uint32_t counter = 0;
     

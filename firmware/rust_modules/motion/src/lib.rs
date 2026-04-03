@@ -81,7 +81,7 @@ pub extern "C" fn detect_motion_advanced(
     let mut total_diff = 0u32;
     let mut noise_level = 0u32;
     
-    for (i, (&a, &b)) in prev_slice.iter().zip(curr_slice.iter()).enumerate() {
+    for (_i, (&a, &b)) in prev_slice.iter().zip(curr_slice.iter()).enumerate() {
         let diff = if a > b { a - b } else { b - a };
         if diff > threshold as u8 {
             changed_pixels += 1;

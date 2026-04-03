@@ -1,31 +1,25 @@
 #include "noise_detection.h"
+#include "../common/smart_monitor_constants.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-#define BABY_CRY_FREQ_MIN 400   // Hz
-#define BABY_CRY_FREQ_MAX 1200  // Hz
-#define SCREAM_FREQ_MIN 2000     // Hz
-#define SCREAM_FREQ_MAX 4000     // Hz
-#define VOICE_FREQ_MIN 100       // Hz
-#define VOICE_FREQ_MAX 4000      // Hz
-
-noise_detector_t* noise_detector_create(int sample_rate) {
+noise_detector_t* noise_detector_create(sample_rate_t sample_rate) {
     noise_detector_t* detector = malloc(sizeof(noise_detector_t));
     if (!detector) {
         return NULL;
     }
     
     memset(detector, 0, sizeof(noise_detector_t));
-    detector->sample_rate = sample_rate;
-    detector->window_size = 1024;
-    detector->crying_threshold = 0.3f;
-    detector->screaming_threshold = 0.5f;
-    detector->voice_threshold = 0.1f;
+    detector->m_sample_rate = sample_rate;
+    detector->m_window_size = 1024;
+    detector->m_crying_threshold = AUDIO_BABY_CRYING_THRESHOLD;
+    detector->m_screaming_threshold = AUDIO_SCREAMING_THRESHOLD;
+    detector->m_voice_threshold = AUDIO_VOICE_ACTIVITY_THRESHOLD;
     
-    detector->fft_buffer = malloc(detector->window_size * sizeof(float));
-    detector->frequency_bins = malloc(detector->window_size / 2 * sizeof(float));
+    detector->m_fft_buffer = malloc(detector->m_window_size * sizeof(float));
+    detector->m_frequency_bins = malloc(detector->m_window_size / 2 * sizeof(float));
     
     return detector;
 }
@@ -35,7 +29,7 @@ bool noise_detector_initialize(noise_detector_t* detector) {
         return false;
     }
     
-    detector->initialized = true;
+    detector->m_initialized = true;
     return true;
 }
 
@@ -44,24 +38,24 @@ void noise_detector_destroy(noise_detector_t* detector) {
         return;
     }
     
-    if (detector->fft_buffer) {
-        free(detector->fft_buffer);
+    if (detector->m_fft_buffer) {
+        free(detector->m_fft_buffer);
     }
     
-    if (detector->frequency_bins) {
-        free(detector->frequency_bins);
+    if (detector->m_frequency_bins) {
+        free(detector->m_frequency_bins);
     }
     
     free(detector);
 }
 
-float calculate_rms_energy(const uint8_t* samples, int count) {
+float calculate_rms_energy(const uint8_t* samples, sample_count_t count) {
     if (count == 0) return 0.0f;
     
     int16_t* samples16 = (int16_t*)samples;
     double sum = 0.0;
     
-    for (int i = 0; i < count / 2; i++) {
+    for (sample_count_t i = 0; i < count / 2; i++) {
         double sample = (double)samples16[i] / 32768.0;
         sum += sample * sample;
     }
@@ -82,28 +76,28 @@ float calculate_frequency_energy(const float* frequency_bins, int bin_count,
     return energy;
 }
 
-bool detect_baby_crying(const uint8_t* samples, int count, int sample_rate) {
+bool detect_baby_crying(const uint8_t* samples, sample_count_t count, sample_rate_t sample_rate __attribute__((unused))) {
     // Baby crying typically has:
     // - High frequency components (400-1200 Hz)
     // - Rhythmic patterns
     // - Sustained high energy
     
-    float rms = calculate_rms_energy(samples, count);
-    if (rms < 0.1f) return false;
+    noise_level_t rms = calculate_rms_energy(samples, count);
+    if (rms < AUDIO_BABY_CRYING_THRESHOLD * 0.5f) return false;
     
     // Simple frequency analysis (mock FFT)
     int16_t* samples16 = (int16_t*)samples;
     float high_freq_energy = 0.0f;
     float total_energy = 0.0f;
     
-    for (int i = 0; i < count / 2; i++) {
+    for (sample_count_t i = 0; i < count / 2; i++) {
         float sample = fabsf((float)samples16[i]) / 32768.0f;
         total_energy += sample * sample;
         
         // Mock frequency analysis based on sample variation
         if (i > 0) {
-            float diff = fabsf(samples16[i] - samples16[i-1]) / 32768.0f;
-            if (diff > 0.1f) { // High frequency component
+            float diff = (float)abs(samples16[i] - samples16[i-1]) / 32768.0f;
+            if (diff > AUDIO_BABY_CRYING_THRESHOLD) {
                 high_freq_energy += diff * diff;
             }
         }
@@ -112,72 +106,72 @@ bool detect_baby_crying(const uint8_t* samples, int count, int sample_rate) {
     float high_freq_ratio = total_energy > 0 ? high_freq_energy / total_energy : 0.0f;
     
     // Baby crying detection criteria
-    return (rms > 0.2f && high_freq_ratio > 0.3f && rms < 0.8f);
+    return (rms > AUDIO_BABY_CRYING_THRESHOLD && high_freq_ratio > 0.4f && rms < AUDIO_SCREAMING_THRESHOLD);
 }
 
-bool detect_screaming(const uint8_t* samples, int count, int sample_rate) {
-    float rms = calculate_rms_energy(samples, count);
+bool detect_screaming(const uint8_t* samples, sample_count_t count, sample_rate_t sample_rate __attribute__((unused))) {
+    noise_level_t rms = calculate_rms_energy(samples, count);
     
     // Screaming has very high energy and high frequency components
-    return (rms > 0.5f && rms < 1.0f);
+    return (rms > AUDIO_SCREAMING_THRESHOLD && rms < AUDIO_NOISE_LEVEL_MAX);
 }
 
-float calculate_voice_activity(const uint8_t* samples, int count) {
-    float rms = calculate_rms_energy(samples, count);
+noise_level_t calculate_voice_activity(const uint8_t* samples, sample_count_t count) {
+    noise_level_t rms = calculate_rms_energy(samples, count);
     
     // Voice activity is moderate energy with speech-like characteristics
-    if (rms < 0.05f) return 0.0f;
-    if (rms > 0.8f) return 0.0f; // Too loud for normal speech
+    if (rms < AUDIO_VOICE_ACTIVITY_THRESHOLD) return AUDIO_NOISE_LEVEL_MIN;
+    if (rms > AUDIO_VOICE_ACTIVITY_THRESHOLD * 2.5f) return AUDIO_NOISE_LEVEL_MIN;
     
     // Simple VAD based on energy level
-    return fminf(rms * 2.0f, 1.0f);
+    return fminf(rms * 2.0f, AUDIO_NOISE_LEVEL_MAX);
 }
 
-noise_metrics_t noise_detector_analyze(noise_detector_t* detector, const uint8_t* samples, int count) {
+noise_metrics_t noise_detector_analyze(noise_detector_t* detector, const uint8_t* samples, sample_count_t count) {
     noise_metrics_t metrics = {0};
     
-    metrics.sample_count = count;
-    metrics.timestamp = time(NULL);
+    metrics.m_sample_count = count;
+    metrics.m_timestamp = time(NULL);
     
     // Calculate overall noise level
-    metrics.noise_level = calculate_rms_energy(samples, count);
+    metrics.m_noise_level = calculate_rms_energy(samples, count);
     
     // Peak frequency (mock calculation)
     int16_t* samples16 = (int16_t*)samples;
     float max_change = 0.0f;
-    for (int i = 1; i < count / 2; i++) {
-        float change = fabsf(samples16[i] - samples16[i-1]);
+    for (sample_count_t i = 1; i < count / 2; i++) {
+        float change = (float)abs(samples16[i] - samples16[i-1]);
         if (change > max_change) {
             max_change = change;
         }
     }
-    metrics.peak_frequency = max_change * 100.0f; // Mock frequency
+    metrics.m_peak_frequency = max_change * 100.0f; // Mock frequency
     
     // Detect specific sound types
-    metrics.baby_crying_detected = detect_baby_crying(samples, count, detector->sample_rate);
-    metrics.screaming_detected = detect_screaming(samples, count, detector->sample_rate);
-    metrics.voice_activity = calculate_voice_activity(samples, count);
+    metrics.m_baby_crying_detected = detect_baby_crying(samples, count, detector->m_sample_rate);
+    metrics.m_screaming_detected = detect_screaming(samples, count, detector->m_sample_rate);
+    metrics.m_voice_activity = calculate_voice_activity(samples, count);
     
     return metrics;
 }
 
-sleep_metrics_t calculate_sleep_score(float motion_level, float noise_level, uint32_t duration_minutes) {
+sleep_metrics_t calculate_sleep_score(motion_level_t motion_level, noise_level_t noise_level, sleep_duration_t duration_minutes) {
     sleep_metrics_t metrics = {0};
     
     // Motion score: less motion = better sleep
-    metrics.motion_score = fmaxf(0.0f, 1.0f - motion_level);
+    metrics.m_motion_score = fmaxf(0.0f, 1.0f - motion_level);
     
     // Noise score: less noise = better sleep
-    metrics.noise_score = fmaxf(0.0f, 1.0f - noise_level);
+    metrics.m_noise_score = fmaxf(0.0f, 1.0f - noise_level);
     
     // Overall sleep score (weighted average)
-    metrics.overall_score = (metrics.motion_score * 0.6f) + (metrics.noise_score * 0.4f);
+    metrics.m_overall_score = (metrics.m_motion_score * SLEEP_MOTION_WEIGHT) + (metrics.m_noise_score * SLEEP_NOISE_WEIGHT);
     
     // Deep sleep detected if both motion and noise are very low
-    metrics.deep_sleep_detected = (motion_level < 0.1f && noise_level < 0.1f);
+    metrics.m_deep_sleep_detected = (motion_level < SLEEP_DEEP_THRESHOLD && noise_level < SLEEP_DEEP_THRESHOLD);
     
     // Sleep quality minutes based on overall score
-    metrics.sleep_quality_minutes = (uint32_t)(duration_minutes * metrics.overall_score);
+    metrics.m_sleep_quality_minutes = (uint32_t)(duration_minutes * metrics.m_overall_score);
     
     return metrics;
 }

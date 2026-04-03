@@ -25,4 +25,4 @@ echo "[*] Dashboard will be available at: http://localhost:8080"
 echo "[*] Press Ctrl+C to stop"
 
 # Run the application
-./build/firmware/cpp_core/smart_monitor
+./build/firmware/c_core/smart_monitor --config "$SMART_MONITOR_CONFIG"

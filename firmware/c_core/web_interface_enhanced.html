@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Monitor - IoT Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/styles/main.css">
+</head>
+<body>
+    <header class="header">
+        <h1>🎯 Smart Monitor IoT Dashboard</h1>
+        <nav class="nav-bar">
+            <button class="nav-btn active" data-page="dashboard">📊 Dashboard</button>
+            <button class="nav-btn" data-page="sensors">🌡️ Sensors</button>
+            <button class="nav-btn" data-page="audio">🎵 Audio</button>
+            <button class="nav-btn" data-page="video">📹 Video</button>
+            <button class="nav-btn" data-page="esp32">📶 ESP32</button>
+            <button class="nav-btn" data-page="sleep">😴 Sleep</button>
+            <button class="nav-btn" data-page="system">⚙️ System</button>
+            <button class="nav-btn" data-page="logs">📝 Logs</button>
+        </nav>
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot status-dot--online"></div>
+                <span>System Online</span>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot status-dot--online" id="cameraStatus"></div>
+                <span>Camera Active</span>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot status-dot--online" id="sensorStatus"></div>
+                <span>Sensors Connected</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="alert-banner" id="alertBanner">
+        🚨 <span id="alertMessage">Baby Crying Detected!</span>
+    </div>
+
+    <main class="container">
+        <!-- Dashboard Page -->
+        <section id="dashboard-page" class="page active">
+            <div class="dashboard">
+                <div class="card">
+                    <h3><span class="icon">🌡️</span> Quick Stats</h3>
+                    <div class="sensor-grid">
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="quickTemp">--°C</div>
+                            <div class="sensor-label">Temperature</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="quickHumidity">--%</div>
+                            <div class="sensor-label">Humidity</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="quickNoise">0.00</div>
+                            <div class="sensor-label">Noise Level</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="quickSleep">--</div>
+                            <div class="sensor-label">Sleep Score</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3><span class="icon">📊</span> System Overview</h3>
+                    <div class="chart-container">
+                        <canvas id="overviewChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sensors Page -->
+        <section id="sensors-page" class="page">
+            <div class="dashboard">
+                <div class="card">
+                    <h3><span class="icon">🌡️</span> I2C Environmental Sensors</h3>
+                    <div class="sensor-grid">
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="temperature">--°C</div>
+                            <div class="sensor-label">Temperature</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="humidity">--%</div>
+                            <div class="sensor-label">Humidity</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="light">--</div>
+                            <div class="sensor-label">Light Level</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="motion">--</div>
+                            <div class="sensor-label">Motion</div>
+                        </div>
+                    </div>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="toggleI2CSensorsBtn">Toggle Sensors</button>
+                        <button class="btn btn-danger" id="simulateHeatWaveBtn">Simulate Heat</button>
+                        <button class="btn btn-primary" id="calibrateSensorsBtn">Calibrate</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3><span class="icon">📱</span> IMU Motion Sensor</h3>
+                    <div class="chart-container">
+                        <canvas id="imuChart"></canvas>
+                    </div>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="calibrateIMUBtn">Calibrate IMU</button>
+                        <button class="btn btn-danger" id="testMotionBtn">Test Motion</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Audio Page -->
+        <section id="audio-page" class="page">
+            <div class="dashboard">
+                <div class="card">
+                    <h3><span class="icon">🎵</span> Audio Analysis & Controls</h3>
+                    <div class="sensor-grid">
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="noiseLevel">0.00</div>
+                            <div class="sensor-label">Noise Level</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="voiceActivity">0.00</div>
+                            <div class="sensor-label">Voice Activity</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="babyCryingStatus">NO</div>
+                            <div class="sensor-label">Baby Crying</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="screamingStatus">NO</div>
+                            <div class="sensor-label">Screaming</div>
+                        </div>
+                    </div>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="toggleAudioCaptureBtn">Toggle Audio</button>
+                        <button class="btn btn-danger" id="testBabyCryingBtn">Test Baby Cry</button>
+                        <button class="btn btn-primary" id="calibrateAudioBtn">Calibrate</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="audioChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3><span class="icon">🎛️</span> Audio Settings</h3>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="setAudioThresholdBtn">Set Threshold</button>
+                        <button class="btn btn-danger" id="resetAudioStatsBtn">Reset Stats</button>
+                        <button class="btn btn-primary" id="exportAudioDataBtn">Export Data</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Video Page -->
+        <section id="video-page" class="page">
+            <div class="dashboard">
+                <div class="card">
+                    <h3><span class="icon">📹</span> Video Monitoring</h3>
+                    <div class="video-container">
+                        <canvas id="videoCanvas"></canvas>
+                    </div>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="startAnalysisBtn">Start Analysis</button>
+                        <button class="btn btn-danger" id="stopAnalysisBtn">Stop Analysis</button>
+                        <button class="btn btn-primary" id="takeSnapshotBtn">Snapshot</button>
+                        <button class="btn btn-danger" id="toggleRecordingBtn">Record</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3><span class="icon">📊</span> Motion Detection Stats</h3>
+                    <div class="sensor-grid">
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="motionEvents">0</div>
+                            <div class="sensor-label">Motion Events</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="framesProcessed">0</div>
+                            <div class="sensor-label">Frames Processed</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="motionLevel">0.00</div>
+                            <div class="sensor-label">Motion Level</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="lastMotion">Never</div>
+                            <div class="sensor-label">Last Motion</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ESP32 Page -->
+        <section id="esp32-page" class="page">
+            <div class="dashboard">
+                <div class="card">
+                    <h3><span class="icon">📶</span> ESP32 Side Device</h3>
+                    <div class="esp32-status">
+                        <div>📡 Device Connected</div>
+                        <div class="battery-indicator">
+                            <div class="battery-level" id="batteryLevel"></div>
+                        </div>
+                        <div id="esp32Temp">Temperature: --°C</div>
+                        <div id="esp32Humidity">Humidity: --%</div>
+                        <div id="esp32Signal">Signal: -- dBm</div>
+                    </div>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="toggleESP32Btn">Toggle ESP32</button>
+                        <button class="btn btn-danger" id="pingESP32Btn">Ping Device</button>
+                        <button class="btn btn-primary" id="updateESP32FirmwareBtn">Update Firmware</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3><span class="icon">📡</span> ESP32 Communication</h3>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="sendUARTCommandBtn">Send UART Command</button>
+                        <button class="btn btn-danger" id="toggleBLEBtn">Toggle BLE</button>
+                        <button class="btn btn-primary" id="scanBLEDevicesBtn">Scan BLE</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Sleep Page -->
+        <section id="sleep-page" class="page">
+            <div class="dashboard">
+                <div class="card">
+                    <h3><span class="icon">😴</span> Sleep Quality Score</h3>
+                    <div class="sleep-score">
+                        <div class="score-value" id="sleepScore">--</div>
+                        <div class="score-label">Overall Sleep Quality</div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="sleepChart"></canvas>
+                    </div>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="startSleepTrackingBtn">Start Tracking</button>
+                        <button class="btn btn-danger" id="stopSleepTrackingBtn">Stop Tracking</button>
+                        <button class="btn btn-primary" id="exportSleepDataBtn">Export Data</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3><span class="icon">📈</span> Sleep Statistics</h3>
+                    <div class="sensor-grid">
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="totalSleepTime">0h</div>
+                            <div class="sensor-label">Total Sleep</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="deepSleepTime">0h</div>
+                            <div class="sensor-label">Deep Sleep</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="remSleepTime">0h</div>
+                            <div class="sensor-label">REM Sleep</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="sleepEfficiency">0%</div>
+                            <div class="sensor-label">Efficiency</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- System Page -->
+        <section id="system-page" class="page">
+            <div class="dashboard">
+                <div class="card">
+                    <h3><span class="icon">⚙️</span> System Status</h3>
+                    <div class="sensor-grid">
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="uptime">0s</div>
+                            <div class="sensor-label">Uptime</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="cpuUsage">0%</div>
+                            <div class="sensor-label">CPU Usage</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="memoryUsage">0%</div>
+                            <div class="sensor-label">Memory</div>
+                        </div>
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="systemTemp">0°C</div>
+                            <div class="sensor-label">Temperature</div>
+                        </div>
+                    </div>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="rebootSystemBtn">Reboot</button>
+                        <button class="btn btn-danger" id="shutdownSystemBtn">Shutdown</button>
+                        <button class="btn btn-primary" id="systemDiagnosticsBtn">Diagnostics</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3><span class="icon">📊</span> System Resources & FPS</h3>
+                    <div style="display: flex; justify-content: space-around; margin-bottom: 20px;">
+                        <div style="width: 30%; position: relative; text-align: center;">
+                            <canvas id="fpsGauge"></canvas>
+                            <div style="position: absolute; bottom: 0; width: 100%; font-weight: bold;">FPS: <span id="fpsValue">0</span></div>
+                        </div>
+                        <div style="width: 45%; position: relative; text-align: center;">
+                            <canvas id="cpuGauge"></canvas>
+                            <div style="position: absolute; bottom: 0; width: 100%; font-weight: bold;">CPU: <span id="cpuValue">0</span>%</div>
+                        </div>
+                        <div style="width: 45%; position: relative; text-align: center;">
+                            <canvas id="ramGauge"></canvas>
+                            <div style="position: absolute; bottom: 0; width: 100%; font-weight: bold;">RAM: <span id="ramValue">0</span>%</div>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="height: 120px; margin-bottom: 10px;">
+                        <canvas id="fpsChart"></canvas>
+                    </div>
+                    <div class="chart-container" style="height: 180px;">
+                        <canvas id="metricsChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3><span class="icon">🔒</span> Firmware Security</h3>
+                    <div class="sensor-grid">
+                        <div class="sensor-item">
+                            <div class="sensor-value" id="firmwareSignature">N/A</div>
+                            <div class="sensor-label">Current Firmware SHA256</div>
+                        </div>
+                    </div>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="verifyFirmwareSignatureBtn">Verify Signature</button>
+                        <button class="btn btn-danger" id="updateFirmwareBtn">Update Firmware</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Logs Page -->
+        <section id="logs-page" class="page">
+            <div class="dashboard">
+                <div class="card">
+                    <h3><span class="icon">📝</span> System Logs</h3>
+                    <div class="controls">
+                        <button class="btn btn-primary" id="refreshLogsBtn">Refresh</button>
+                        <button class="btn btn-danger" id="clearLogsBtn">Clear Logs</button>
+                        <button class="btn btn-primary" id="downloadLogsBtn">Download Logs</button>
+                        <button class="btn btn-primary" id="toggleLogLevelBtn">Toggle Level</button>
+                    </div>
+                    <div class="logs-container" id="logsContainer">
+                        <div class="log-entry log-info">[INFO] System started</div>
+                        <div class="log-entry log-warning">[WARN] Mock mode enabled</div>
+                        <div class="log-entry log-info">[INFO] All sensors initialized</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="/scripts/app.js"></script>
+</body>
+</html>

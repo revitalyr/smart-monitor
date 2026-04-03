@@ -22,37 +22,131 @@
 #include <signal.h>
 #include <time.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <getopt.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <errno.h>
 
 #define DEFAULT_PORT 8080
 #define DEFAULT_DEVICE "/dev/video0"
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 480
 
+// Бинарный протокол для общения с Web UI
+#pragma pack(push, 1)
+typedef struct {
+    uint32_t magic;           // 0x534D4F4E ('SMON')
+    uint32_t uptime_secs;
+    
+    // Видео и движение
+    uint32_t motion_events;
+    float    motion_level;
+    uint32_t frames_processed;
+    float    frame_processing_latency_ms; // New field for latency
+    uint8_t  camera_active;
+
+    // Сенсоры I2C
+    float    temp;
+    float    humidity;
+    uint16_t light;
+    uint8_t  motion_detected;
+
+    // IMU данные (SPI)
+    int16_t  acc_x, acc_y, acc_z;
+    
+    // Аудио данные
+    float    audio_level;
+    uint8_t  audio_alert;
+
+    // Данные от ESP32 (UART/BLE)
+    float    esp32_temp;
+    float    esp32_hum;
+    uint8_t  battery;
+
+    // Системные метрики
+    uint8_t  cpu_usage;
+    uint8_t  mem_usage;
+} monitor_packet_t;
+#pragma pack(pop)
+
 typedef struct {
     char* device;
-    int port;
-    bool mock_mode;
-    bool debug_mode;
-    char* log_file;
-    bool syslog_mode;
-    char* config_file;
+    port_t m_port;
+    bool m_mock_mode;
+    bool m_debug_mode;
+    char* m_log_file;
+    bool m_syslog_mode;
+    char* m_config_file;
 } config_t;
 
 static volatile bool running = true;
+static monitor_packet_t g_current_packet = { .magic = 0x534D4F4E };
+static time_t g_start_time;
+
+#ifdef ENABLE_AUDIO
+static bool g_audio_capture_enabled = true; // Global state for audio capture
+#endif
+
 static config_t config = {
     .device = DEFAULT_DEVICE,
-    .port = DEFAULT_PORT,
-    .mock_mode = false,
-    .debug_mode = false,
-    .log_file = NULL,
-    .syslog_mode = false,
-    .config_file = "/etc/smartmonitor.conf"
+    .m_port = DEFAULT_PORT,
+    .m_mock_mode = false,
+    .m_debug_mode = false,
+    .m_log_file = NULL,
+    .m_syslog_mode = false,
+    .m_config_file = "/etc/smartmonitor.conf"
 };
+
+bool is_port_in_use(port_t port) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return false;
+    
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(port);
+    
+    int result = bind(sock, (struct sockaddr*)&addr, sizeof(addr));
+    close(sock);
+    
+    return (result == -1) && (errno == EADDRINUSE);
+}
+
+void shutdown_existing_instance(port_t port) {
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return;
+    
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    addr.sin_port = htons(port);
+    
+    if (connect(sock, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+        // Send shutdown request
+        const char* shutdown_msg = "POST /system/shutdown HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n";
+        send(sock, shutdown_msg, strlen(shutdown_msg), 0);
+        printf("Sent shutdown request to existing instance on port %d\n", port);
+        sleep(2); // Give it time to shutdown
+    }
+    close(sock);
+}
 
 void signal_handler(int sig) {
     (void)sig;
     printf("\nShutting down Smart Monitor...\n");
+    running = false;
+    
+    // Reinstall signal handler for subsequent Ctrl+C
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+}
+
+void alarm_handler(int sig) {
+    (void)sig;
+    printf("Alarm triggered. Forcing shutdown...\n");
     running = false;
 }
 
@@ -97,22 +191,22 @@ void parse_arguments(int argc, char* argv[]) {
                 config.device = strdup(optarg);
                 break;
             case 'p':
-                config.port = atoi(optarg);
+                config.m_port = atoi(optarg);
                 break;
             case 'm':
-                config.mock_mode = true;
+                config.m_mock_mode = true;
                 break;
             case 'D':
-                config.debug_mode = true;
+                config.m_debug_mode = true;
                 break;
             case 'l':
-                config.log_file = strdup(optarg);
+                config.m_log_file = strdup(optarg);
                 break;
             case 's':
-                config.syslog_mode = true;
+                config.m_syslog_mode = true;
                 break;
             case 'c':
-                config.config_file = strdup(optarg);
+                config.m_config_file = strdup(optarg);
                 break;
             case 'h':
                 print_usage(argv[0]);
@@ -127,10 +221,10 @@ void parse_arguments(int argc, char* argv[]) {
 }
 
 void load_config_file() {
-    FILE* file = fopen(config.config_file, "r");
+    FILE* file = fopen(config.m_config_file, "r");
     if (!file) {
-        if (config.debug_mode) {
-            printf("Config file %s not found, using defaults\n", config.config_file);
+        if (config.m_debug_mode) {
+            printf("Config file %s not found, using defaults\n", config.m_config_file);
         }
         return;
     }
@@ -146,11 +240,11 @@ void load_config_file() {
             if (strcmp(key, "device") == 0) {
                 config.device = strdup(value);
             } else if (strcmp(key, "port") == 0) {
-                config.port = atoi(value);
+                config.m_port = atoi(value);
             } else if (strcmp(key, "mock_mode") == 0) {
-                config.mock_mode = (strcmp(value, "true") == 0);
+                config.m_mock_mode = (strcmp(value, "true") == 0);
             } else if (strcmp(key, "debug") == 0) {
-                config.debug_mode = (strcmp(value, "true") == 0);
+                config.m_debug_mode = (strcmp(value, "true") == 0);
             }
         }
     }
@@ -162,13 +256,13 @@ void log_message(const char* level, const char* message) {
     char timestamp[64];
     strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
     
-    if (config.log_file) {
-        FILE* log = fopen(config.log_file, "a");
+    if (config.m_log_file) {
+        FILE* log = fopen(config.m_log_file, "a");
         if (log) {
             fprintf(log, "[%s] %s: %s\n", timestamp, level, message);
             fclose(log);
         }
-    } else if (config.syslog_mode) {
+    } else if (config.m_syslog_mode) {
         // syslog integration would go here
         printf("[%s] %s: %s\n", timestamp, level, message);
     } else {
@@ -197,14 +291,79 @@ char* calculate_uptime(time_t start_time) {
     return uptime_str;
 }
 
-char* metrics_callback_wrapper(void) {
-    // This would be called from HTTP server
-    // For now, return a simple JSON
-    return strdup("{\"motion_events\":0,\"motion_level\":0.00,\"frames_processed\":0,\"camera_active\":false,\"last_motion_time\":\"\",\"uptime\":\"0s\"}");
+static void update_system_info(uint8_t *cpu, uint8_t *mem) {
+    // Расчет использования RAM через /proc/meminfo
+    FILE *fp = fopen("/proc/meminfo", "r");
+    if (fp) {
+        long total = 0, available = 0;
+        char line[128];
+        while (fgets(line, sizeof(line), fp)) {
+            if (sscanf(line, "MemTotal: %ld kB", &total) == 1) continue;
+            if (sscanf(line, "MemAvailable: %ld kB", &available) == 1) break;
+        }
+        fclose(fp);
+        if (total > 0) {
+            *mem = (uint8_t)((total - available) * 100 / total);
+        }
+    }
+
+    // Расчет загрузки CPU через /proc/stat
+    static long long last_total = 0, last_idle = 0;
+    fp = fopen("/proc/stat", "r");
+    if (fp) {
+        long long user, nice, system, idle, iowait, irq, softirq, steal;
+        // Читаем первую строку (суммарная статистика по всем ядрам)
+        if (fscanf(fp, "cpu %lld %lld %lld %lld %lld %lld %lld %lld", 
+                   &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal) >= 4) {
+            
+            long long current_idle = idle + iowait;
+            long long current_total = user + nice + system + current_idle + irq + softirq + steal;
+            
+            if (last_total != 0) {
+                long long total_diff = current_total - last_total;
+                long long idle_diff = current_idle - last_idle;
+                if (total_diff > 0) {
+                    *cpu = (uint8_t)(100 * (total_diff - idle_diff) / total_diff);
+                }
+            }
+            last_total = current_total;
+            last_idle = current_idle;
+        }
+        fclose(fp);
+    }
 }
 
+char* metrics_callback_wrapper(void) {
+    // Обновляем системные показатели перед отправкой пакета
+    update_system_info(&g_current_packet.cpu_usage, &g_current_packet.mem_usage);
+    g_current_packet.frame_processing_latency_ms = 0.0f; // Reset or update elsewhere
+
+    // Обновляем аптайм перед отправкой
+    g_current_packet.uptime_secs = (uint32_t)difftime(time(NULL), g_start_time);
+    
+    // Выделяем память под копию структуры (HTTP сервер освободит её после отправки)
+    monitor_packet_t* response = malloc(sizeof(monitor_packet_t));
+    memcpy(response, &g_current_packet, sizeof(monitor_packet_t));
+    
+    return (char*)response;
+}
+
+#ifdef ENABLE_AUDIO
+static audio_capture_t* audio_capture_instance = NULL; // Global audio instance
+static noise_detector_t* noise_detector_instance = NULL; // Global noise detector instance
+
+static void main_audio_toggle_callback(bool enable) {
+    g_audio_capture_enabled = enable;
+    if (enable) {
+        if (audio_capture_instance && !audio_is_capturing(audio_capture_instance)) audio_start_capture(audio_capture_instance);
+    } else {
+        if (audio_capture_instance && audio_is_capturing(audio_capture_instance)) audio_stop_capture(audio_capture_instance);
+    }
+}
+#endif
+
 char* health_callback_wrapper(void) {
-    return strdup("{\"status\":\"ok\",\"service\":\"smart-monitor\",\"version\":\"1.0.0\"}");
+    return strdup("OK");
 }
 
 char* webrtc_callback_wrapper(void) {
@@ -225,27 +384,54 @@ int main(int argc, char* argv[]) {
     // Load configuration file
     load_config_file();
     
+    // Check if port is already in use and shutdown existing instance
+    if (is_port_in_use(config.m_port)) {
+        printf("Port %d is already in use. Attempting to shutdown existing instance...\n", config.m_port);
+        shutdown_existing_instance(config.m_port);
+        
+        // Check again after shutdown attempt
+        if (is_port_in_use(config.m_port)) {
+            fprintf(stderr, "Error: Port %d is still in use. Another instance may be running.\n", config.m_port);
+            fprintf(stderr, "Please manually kill the process or use a different port.\n");
+            return 1;
+        }
+        printf("Previous instance shutdown successfully.\n");
+    }
+    
     // Setup logging
-    if (config.debug_mode) {
+    if (config.m_debug_mode) {
         log_message("DEBUG", "Smart Monitor starting in debug mode");
     }
     
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
+    signal(SIGALRM, alarm_handler);
     
     log_message("INFO", "Smart Monitor starting...");
     
-    time_t start_time = time(NULL);
+    g_start_time = time(NULL);
     
     // Initialize components with config
-    const char* device = config.mock_mode ? NULL : config.device;
+    const char* device = config.m_mock_mode ? NULL : config.device;
     v4l2_capture_t* camera = v4l2_create(device);
+    if (!camera) {
+        log_message("ERROR", "Failed to create camera");
+    }
+    
     rust_motion_detector_t* motion_detector = rust_detector_create();
-    http_server_t* http_server = http_server_create(config.port);
+    if (!motion_detector) {
+        log_message("ERROR", "Failed to create motion detector");
+    }
+    
+    http_server_t* http_server = http_server_create(config.m_port);
+    if (!http_server) {
+        log_message("ERROR", "Failed to create HTTP server");
+    }
+    
     // Initialize WebRTC server (optional)
-    webrtc_server_t* webrtc_server = NULL;
     #ifdef ENABLE_WEBRTC
-    webrtc_server = webrtc_server_create(device);
+    webrtc_server_t* webrtc_server = NULL;
+    (void)webrtc_server; // Suppress unused variable warning when WebRTC is disabled
     #endif
     
     if (!camera || !motion_detector || !http_server) {
@@ -255,7 +441,7 @@ int main(int argc, char* argv[]) {
     
     // Initialize camera
     if (!v4l2_initialize(camera, DEFAULT_WIDTH, DEFAULT_HEIGHT)) {
-        if (config.mock_mode) {
+        if (config.m_mock_mode) {
             log_message("INFO", "Mock mode enabled");
         } else {
             log_message("WARNING", "Failed to initialize camera, using mock mode");
@@ -266,8 +452,14 @@ int main(int argc, char* argv[]) {
     
     // Initialize motion detector
     if (!rust_detector_initialize(motion_detector)) {
-        log_message("ERROR", "Failed to initialize motion detector");
-        goto cleanup;
+        if (config.m_mock_mode) {
+            log_message("INFO", "Mock mode: motion detector initialization skipped");
+        } else {
+            log_message("ERROR", "Failed to initialize motion detector");
+            goto cleanup;
+        }
+    } else {
+        log_message("INFO", "Motion detector initialized successfully");
     }
     
     // Start HTTP server
@@ -277,7 +469,7 @@ int main(int argc, char* argv[]) {
     }
     
     char port_msg[64];
-    snprintf(port_msg, sizeof(port_msg), "HTTP server started on port %d", config.port);
+    snprintf(port_msg, sizeof(port_msg), "HTTP server started on port %d", config.m_port);
     log_message("INFO", port_msg);
     
     // Initialize WebRTC server
@@ -338,7 +530,8 @@ int main(int argc, char* argv[]) {
         } else {
             metrics_data_t* metrics = http_server_get_metrics(http_server);
             if (metrics) {
-                metrics->camera_active = true;
+                metrics->m_camera_active = true;
+                g_current_packet.camera_active = 1;
             }
             printf("Camera capture started\n");
         }
@@ -346,7 +539,7 @@ int main(int argc, char* argv[]) {
     
     // Main processing loop
     uint8_t* prev_frame = NULL;
-    size_t prev_frame_size = 0;
+    size_t prev_frame_size __attribute__((unused)) = 0;
     
     while (running) {
         uint8_t* current_frame = NULL;
@@ -370,7 +563,7 @@ int main(int argc, char* argv[]) {
                 for (int y = object_y; y < object_y + object_size && y < 480; y++) {
                     for (int x = object_x; x < object_x + object_size && x < 640; x++) {
                         int pixel_idx = (y * 640 + x) * 2;
-                        if (pixel_idx < current_frame_size - 1) {
+                        if ((size_t)pixel_idx < current_frame_size - 1) {
                             // Bright white object for motion detection
                             current_frame[pixel_idx] = 0xFF; // Y component
                             current_frame[pixel_idx + 1] = 0x80; // U/V component
@@ -399,11 +592,15 @@ int main(int argc, char* argv[]) {
                     if (gray_size > 0 && gray_size <= 1000000) { // 1MB limit
                         // Ensure detector is initialized
                         if (!rust_detector_initialize(motion_detector)) {
-                            fprintf(stderr, "Failed to initialize motion detector\n");
+                            log_message("ERROR", "Failed to initialize motion detector before detection");
                         } else {
                             // Add signal handler for safety
                             signal(SIGSEGV, signal_handler);
                             
+                            struct timespec start_time_ns, end_time_ns;
+                            long long elapsed_ns;
+
+                            clock_gettime(CLOCK_MONOTONIC, &start_time_ns);
                             motion_result_t result = rust_detector_detect_motion_advanced(
                                 motion_detector,
                                 gray_prev,
@@ -414,32 +611,46 @@ int main(int argc, char* argv[]) {
                             );
                             
                             // Restore default signal handler
+                            clock_gettime(CLOCK_MONOTONIC, &end_time_ns);
+                            elapsed_ns = (end_time_ns.tv_sec - start_time_ns.tv_sec) * 1000000000LL +
+                                         (end_time_ns.tv_nsec - start_time_ns.tv_nsec);
+                            g_current_packet.frame_processing_latency_ms = (float)elapsed_ns / 1000000.0f;
                             signal(SIGSEGV, SIG_DFL);
                             
                             if (result.motion_detected) {
                                 metrics_data_t* metrics = http_server_get_metrics(http_server);
+                                g_current_packet.motion_events++;
+                                g_current_packet.motion_level = result.motion_level;
                                 if (metrics) {
-                                    metrics->motion_events++;
-                                    metrics->motion_level = result.motion_level;
-                                    strncpy(metrics->last_motion_time, get_current_time(), 
-                                           sizeof(metrics->last_motion_time) - 1);
+                                    metrics->m_motion_events++;
+                                    metrics->m_motion_level = result.motion_level;
+                                    strncpy(metrics->m_last_motion_time, get_current_time(), 
+                                           sizeof(metrics->m_last_motion_time) - 1);
                                 }
                             }
                             
                             #ifdef ENABLE_AUDIO
                             // Audio analysis
-                            if (audio && noise_detector) {
+                            if (audio_capture_instance && noise_detector_instance && g_audio_capture_enabled) {
                                 uint8_t audio_samples[4096];
-                                int samples_read = audio_read_samples(audio, audio_samples, sizeof(audio_samples));
+                                int samples_read = audio_read_samples(audio_capture_instance, audio_samples, sizeof(audio_samples));
                                 if (samples_read > 0) {
                                     noise_metrics_t noise_metrics = noise_detector_analyze(noise_detector, audio_samples, samples_read);
                                     
-                                    // Log significant events
-                                    if (noise_metrics.baby_crying_detected) {
+                                    g_current_packet.audio_level = noise_metrics.m_noise_level;
+                                    
+                                    // Log significant events with throttling
+                                    static uint32_t last_alert_time = 0;
+                                    uint32_t current_time = time(NULL);
+                                    
+                                    if (noise_metrics.m_baby_crying_detected && (current_time - last_alert_time) > 30) {
                                         log_message("ALERT", "Baby crying detected!");
+                                        last_alert_time = current_time;
+                                        g_current_packet.audio_alert = 1;
                                     }
-                                    if (noise_metrics.screaming_detected) {
+                                    if (noise_metrics.m_screaming_detected && (current_time - last_alert_time) > 30) {
                                         log_message("ALERT", "Screaming detected!");
+                                        last_alert_time = current_time;
                                     }
                                 }
                             }
@@ -453,23 +664,27 @@ int main(int argc, char* argv[]) {
                             // I2C sensor reading
                             if (i2c_sensor && sensor_counter % 100 == 0) {
                                 sensor_data_t sensor_data = i2c_read_sensor_data(i2c_sensor);
+                                g_current_packet.temp = sensor_data.temperature;
+                                g_current_packet.humidity = sensor_data.humidity;
+                                g_current_packet.light = sensor_data.light_level;
+                                g_current_packet.motion_detected = sensor_data.motion_detected;
+                                
                                 char sensor_msg[128];
                                 snprintf(sensor_msg, sizeof(sensor_msg), 
                                         "I2C: T=%.1f°C H=%.1f%% L=%d M=%s",
                                         sensor_data.temperature, sensor_data.humidity,
                                         sensor_data.light_level, sensor_data.motion_detected ? "YES" : "NO");
-                                log_message("SENSOR", sensor_msg);
                             }
                             
                             // SPI IMU reading
                             if (spi_device && sensor_counter % 50 == 0) {
                                 imu_data_t imu_data = spi_read_imu_data(spi_device);
+                                g_current_packet.acc_x = imu_data.m_accelerometer_x;
+                                g_current_packet.acc_y = imu_data.m_accelerometer_y;
+                                g_current_packet.acc_z = imu_data.m_accelerometer_z;
+                                
                                 char imu_msg[128];
-                                snprintf(imu_msg, sizeof(imu_msg),
-                                        "IMU: ACC(%d,%d,%d) GYRO(%d,%d,%d)",
-                                        imu_data.accelerometer_x, imu_data.accelerometer_y, imu_data.accelerometer_z,
-                                        imu_data.gyroscope_x, imu_data.gyroscope_y, imu_data.gyroscope_z);
-                                log_message("SENSOR", imu_msg);
+                                // log_message("SENSOR", imu_msg);
                             }
                             
                             // ESP32 device reading
@@ -480,7 +695,11 @@ int main(int argc, char* argv[]) {
                                         "ESP32: T=%.1f°C H=%.1f%% BAT=%d%% L=%d",
                                         esp32_data.temperature, esp32_data.humidity,
                                         esp32_data.battery_level, esp32_data.light_level);
-                                log_message("SENSOR", esp32_msg);
+                                
+                                g_current_packet.esp32_temp = esp32_data.temperature;
+                                g_current_packet.esp32_hum = esp32_data.humidity;
+                                g_current_packet.battery = esp32_data.battery_level;
+                                
                                 
                                 // Send data via UART
                                 if (uart) {
@@ -501,7 +720,8 @@ int main(int argc, char* argv[]) {
                 
                 metrics_data_t* metrics = http_server_get_metrics(http_server);
                 if (metrics) {
-                    metrics->frames_processed++;
+                    g_current_packet.frames_processed++;
+                    metrics->m_frames_processed++;
                 }
             }
             
@@ -520,12 +740,14 @@ int main(int argc, char* argv[]) {
         // Update uptime
         metrics_data_t* metrics = http_server_get_metrics(http_server);
         if (metrics) {
-            strncpy(metrics->uptime, calculate_uptime(start_time), 
-                   sizeof(metrics->uptime) - 1);
+            strncpy(metrics->m_uptime, calculate_uptime(g_start_time), 
+                   sizeof(metrics->m_uptime) - 1);
         }
         
-        // Sleep to control frame rate
-        usleep(33000); // ~30 FPS
+        // Sleep to control frame rate with signal checking
+        for (int i = 0; i < 33 && running; i++) {
+            usleep(1000); // Sleep in 1ms chunks to allow faster signal response
+        }
     }
     
     // Cleanup
@@ -537,10 +759,12 @@ cleanup:
     printf("\nShutting down Smart Monitor...\n");
     
     if (camera) {
-        v4l2_stop_capture(camera);
         v4l2_destroy(camera);
     }
-    
+#ifdef ENABLE_AUDIO
+    if (audio_capture_instance) audio_destroy(audio_capture_instance);
+    if (noise_detector_instance) noise_detector_destroy(noise_detector_instance);
+#endif
     if (motion_detector) {
         rust_detector_destroy(motion_detector);
     }

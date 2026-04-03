@@ -30,8 +30,12 @@ if(ENABLE_AUDIO)
 endif()
 
 if(ENABLE_WEBRTC)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(WEBRTC REQUIRED libwebrtc)
+    find_package(PkgConfig QUIET)
+    pkg_check_modules(WEBRTC QUIET libwebrtc)
+    if(NOT WEBRTC_FOUND)
+        message(WARNING "WebRTC library not found - WebRTC features will be disabled")
+        set(ENABLE_WEBRTC OFF)
+    endif()
 endif()
 
 if(ENABLE_CURL)
@@ -86,7 +90,7 @@ if(ENABLE_AUDIO)
     list(APPEND LINK_LIBS ${ALSA_LIBRARIES})
 endif()
 
-if(ENABLE_WEBRTC)
+if(ENABLE_WEBRTC AND WEBRTC_FOUND)
     list(APPEND LINK_LIBS ${WEBRTC_LIBRARIES})
 endif()
 
@@ -94,7 +98,7 @@ if(ENABLE_CURL)
     list(APPEND LINK_LIBS ${CURL_LIBRARIES})
 endif()
 
-if(WITH_SYSTEMD)
+if(WITH_SYSTEMD AND SYSTEMD_FOUND)
     list(APPEND LINK_LIBS ${SYSTEMD_LIBRARIES})
 endif()
 
@@ -106,6 +110,21 @@ target_include_directories(smart_monitor PRIVATE
     ${GST_APP_INCLUDE_DIRS}
     ${GST_VIDEO_INCLUDE_DIRS}
 )
+
+if(ENABLE_WEBRTC AND WEBRTC_FOUND)
+    target_include_directories(smart_monitor PRIVATE ${WEBRTC_INCLUDE_DIRS})
+    target_compile_options(smart_monitor PRIVATE ${WEBRTC_CFLAGS_OTHER})
+endif()
+
+if(ENABLE_AUDIO)
+    target_include_directories(smart_monitor PRIVATE ${ALSA_INCLUDE_DIRS})
+    target_compile_options(smart_monitor PRIVATE ${ALSA_CFLAGS_OTHER})
+endif()
+
+if(WITH_SYSTEMD AND SYSTEMD_FOUND)
+    target_include_directories(smart_monitor PRIVATE ${SYSTEMD_INCLUDE_DIRS})
+    target_compile_options(smart_monitor PRIVATE ${SYSTEMD_CFLAGS_OTHER})
+endif()
 
 # Compiler flags
 target_compile_options(smart_monitor PRIVATE
@@ -134,6 +153,51 @@ endif()
 # Installation
 install(TARGETS smart_monitor
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+# Copy HTML interface to build directory
+add_custom_command(TARGET smart_monitor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/firmware/c_core/web_interface_enhanced.html
+    ${CMAKE_BINARY_DIR}/firmware/c_core/web_interface_enhanced.html
+    COMMENT "Copying HTML interface to build directory"
+)
+
+# Copy static web assets to build directory
+add_custom_command(TARGET smart_monitor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+    ${CMAKE_BINARY_DIR}/firmware/c_core/styles
+    COMMENT "Creating styles directory"
+)
+add_custom_command(TARGET smart_monitor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/firmware/c_core/styles/main.css
+    ${CMAKE_BINARY_DIR}/firmware/c_core/styles/main.css
+    COMMENT "Copying main.css to build directory"
+)
+add_custom_command(TARGET smart_monitor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+    ${CMAKE_BINARY_DIR}/firmware/c_core/scripts
+    COMMENT "Creating scripts directory"
+)
+add_custom_command(TARGET smart_monitor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/firmware/c_core/scripts/app.js
+    ${CMAKE_BINARY_DIR}/firmware/c_core/scripts/app.js
+    COMMENT "Copying app.js to build directory"
+)
+add_custom_command(TARGET smart_monitor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/firmware/c_core/scripts/charts.js
+    ${CMAKE_BINARY_DIR}/firmware/c_core/scripts/charts.js
+    COMMENT "Copying charts.js to build directory"
+)
+
+# Generate signature for the binary
+add_custom_command(TARGET smart_monitor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E sha256sum smart_monitor > smart_monitor.sig
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/firmware/c_core
+    COMMENT "Generating signature for smart_monitor binary"
 )
 
 # Install configuration file
