@@ -17,7 +17,7 @@ struct data_agent {
     volatile bool running;
     
     // Component instances
-    v4l2_capture_t* camera;
+    V4L2Capture* camera;
     AudioCapture* audio;
     noise_detector_t* noise_detector;
     MotionDetector* motion_detector;
@@ -649,11 +649,13 @@ static void* agent_worker_thread(void* arg) {
                 
                 // Motion detection
                 if (agent->motion_detector && agent->prev_frame) {
-                    motion_result_t result = rust_detector_detect_motion_advanced(
+                    MotionResult result = rust_detector_detect_motion_advanced(
                         agent->motion_detector,
-                        (const uint8_t*)agent->prev_frame, (uint32_t)agent->prev_frame_size,
-                        (const uint8_t*)frame_data, (uint32_t)frame_size,
-                        agent->config.motion_threshold
+                        agent->prev_frame,
+                        (const uint8_t*)frame_data,
+                        DEFAULT_FRAME_WIDTH,
+                        DEFAULT_FRAME_HEIGHT,
+                        (MotionThreshold)(agent->config.motion_threshold * 255)
                     );
                     
                     if (result.motion_detected) {

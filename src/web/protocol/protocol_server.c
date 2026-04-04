@@ -93,22 +93,22 @@ static void handle_client_message(ProtocolServer* server, ClientConnection* clie
                 response.status = 0; // Success
                 
                 switch (cmd->command) {
-                    case CMD_START_CAPTURE:
+                    case 0x01: // CMD_START_CAPTURE
                         // TODO: Start capture
                         printf("Start capture command received\n");
                         break;
                         
-                    case CMD_STOP_CAPTURE:
+                    case 0x02: // CMD_STOP_CAPTURE
                         // TODO: Stop capture
                         printf("Stop capture command received\n");
                         break;
                         
-                    case CMD_GET_STATUS:
+                    case 0x03: // CMD_GET_STATUS
                         // TODO: Send status
                         printf("Get status command received\n");
                         break;
                         
-                    case CMD_SET_THRESHOLD:
+                    case 0x04: // CMD_SET_THRESHOLD
                         // TODO: Set threshold
                         printf("Set threshold command: %f\n", cmd->value / 1000.0f);
                         if (server->agent) {
