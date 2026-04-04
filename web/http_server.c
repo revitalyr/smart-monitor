@@ -28,6 +28,7 @@
 #define API_SYSTEM_STATUS "/system/status"
 #define API_ANALYZE_VIDEO "/analyze/video"
 #define API_ANALYZE_STATUS "/analyze/status"
+#define API_VIDEO_STATUS "/video/status"
 #define API_SYSTEM_LOGS "/system/logs"
 
 #define BINARY_METRICS_SIZE 58 // Размер структуры monitor_packet_t (54 + 4 для latency)
@@ -49,6 +50,7 @@ struct http_server {
     sensor_json_callback_t m_sensor_data_callback;
     audio_json_callback_t m_audio_data_callback;
     system_json_callback_t m_system_data_callback;
+    video_json_callback_t m_video_data_callback;
 };
 
 static void* server_loop(void* arg);
@@ -219,6 +221,12 @@ void http_server_set_audio_data_callback(http_server_t* server, audio_json_callb
 void http_server_set_system_data_callback(http_server_t* server, system_json_callback_t callback) {
     if (server) {
         server->m_system_data_callback = callback;
+    }
+}
+
+void http_server_set_video_data_callback(http_server_t* server, video_json_callback_t callback) {
+    if (server) {
+        server->m_video_data_callback = callback;
     }
 }
 
@@ -491,6 +499,30 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
             snprintf(response, sizeof(response), 
                 "{\"uptime\":%d,\"cpu_usage\":%.1f,\"memory_usage\":%.1f,\"temperature\":%.1f}",
                 s_uptime_counter, cpu_usage, memory_usage, temperature);
+            send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+        }
+    }
+    else if (strstr(buffer, "GET " API_VIDEO_STATUS)) {
+        // Return real video data from data agent
+        if (server->m_video_data_callback) {
+            char* response = server->m_video_data_callback();
+            if (response) {
+                send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
+                free(response);
+            } else {
+                const char* err = "{\"error\":\"video_data_unavailable\"}";
+                send_response(client_fd, "503 Service Unavailable", "application/json", err, strlen(err), "no-cache");
+            }
+        } else {
+            // Fallback to mock data if callback not set
+            char response[200];
+            float motion_prob = (rand() % 1000) / 1000.0f;
+            bool motion_detected = motion_prob > 0.12f;
+            
+            snprintf(response, sizeof(response), 
+                "{\"motion_prob\":%.3f,\"motion_detected\":%s,\"nightlight\":%s,\"light_lux\":%d}",
+                motion_prob, motion_detected ? "true" : "false", 
+                (rand() % 100) > 90 ? "true" : "false", 3 + (rand() % 50));
             send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
         }
     }

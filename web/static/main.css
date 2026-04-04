@@ -192,6 +192,15 @@ body {
     color: #6c757d;
 }
 
+.status-indicator {
+    padding: 8px 12px;
+    background: #28a745;
+    color: white;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
 @media (max-width: 768px) {
     .container {
         padding: 10px;

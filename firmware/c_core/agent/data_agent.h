@@ -69,15 +69,18 @@ void data_agent_set_http_callbacks(data_agent_t* agent,
                                    char* (*sensor_cb)(void),
                                    char* (*audio_cb)(void),
                                    char* (*system_cb)(void));
+void data_agent_set_video_callback(data_agent_t* agent, char* (*video_cb)(void));
 
 // Get JSON data functions
 char* data_agent_get_sensor_json(data_agent_t* agent);
 char* data_agent_get_audio_json(data_agent_t* agent);
+char* data_agent_get_video_json(data_agent_t* agent);
 char* data_agent_get_system_json(data_agent_t* agent);
 
 // JSON generator functions (extern for main.c)
 char* generate_sensor_json(void);
 char* generate_audio_json(void);
+char* generate_video_json(void);
 char* generate_system_json(void);
 
 #ifdef __cplusplus

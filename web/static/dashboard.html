@@ -6,6 +6,158 @@
     <title>Smart Monitor - Real-time Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="main.css">
+    <style>
+        /* ── Base ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f1117;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 16px; }
+
+        /* ── Header ── */
+        .header { text-align: center; padding: 20px 0 12px; }
+        .header h1 { font-size: 1.8rem; font-weight: 700; color: #fff; }
+        .header p  { color: #94a3b8; font-size: 0.9rem; margin-top: 4px; }
+
+        /* ── Status bar ── */
+        .status-bar {
+            display: flex; align-items: center; gap: 24px;
+            background: #1e2330; border: 1px solid #2d3748;
+            border-radius: 10px; padding: 10px 18px; margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+        .status-indicator { display: flex; align-items: center; gap: 8px; }
+        .status-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: #ef4444; box-shadow: 0 0 6px #ef4444;
+        }
+        .status-dot.connected { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+        .connection-info { color: #94a3b8; font-size: 0.82rem; }
+
+        /* ── Card ── */
+        .card {
+            background: #1e2330; border: 1px solid #2d3748;
+            border-radius: 14px; padding: 20px;
+        }
+        .card h3 { font-size: 0.85rem; font-weight: 600; color: #64748b;
+                   letter-spacing: .06em; text-transform: uppercase; margin-bottom: 16px; }
+
+        /* ══════════════════════════════════
+           TOP ZONE  —  2-column flex row
+           ══════════════════════════════════ */
+        .top-zone {
+            display: flex; gap: 16px; margin-bottom: 16px; align-items: stretch;
+        }
+        .detectors-card { flex: 3; min-width: 0; }
+        .comfort-card   { flex: 2; min-width: 0; }
+
+        /* Detectors grid — 4 equal cells */
+        .detectors-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+        .detector-item {
+            background: #151821; border: 2px solid #2d3748;
+            border-radius: 12px; padding: 16px 10px;
+            text-align: center; transition: border-color .25s, background .25s;
+        }
+        .detector-item.alert-on {
+            border-color: #ef4444;
+            background: #1f1015;
+            animation: pulse-border .9s infinite alternate;
+        }
+        .detector-item.active {
+            border-color: #f59e0b;
+            background: #1a1608;
+        }
+        @keyframes pulse-border {
+            from { box-shadow: 0 0 0 0 rgba(239,68,68,.4); }
+            to   { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+        }
+        .detector-icon  { font-size: 1.6rem; margin-bottom: 6px; }
+        .detector-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase;
+                          letter-spacing: .06em; margin-bottom: 8px; }
+        .detector-value {
+            font-size: 1.25rem; font-weight: 700; color: #e2e8f0;
+            font-variant-numeric: tabular-nums;
+        }
+        .detector-sub   { font-size: 0.78rem; color: #64748b; margin-top: 4px; }
+
+        /* Comfort grid — 3 large readings */
+        .comfort-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .comfort-item {
+            background: #151821; border: 1px solid #2d3748;
+            border-radius: 12px; padding: 18px 10px; text-align: center;
+        }
+        .comfort-icon  { font-size: 1.5rem; margin-bottom: 6px; }
+        .comfort-big   { font-size: 2.2rem; font-weight: 800; color: #fff;
+                         font-variant-numeric: tabular-nums; line-height: 1; }
+        .comfort-unit  { font-size: 0.85rem; color: #64748b; margin: 2px 0 6px; }
+        .comfort-label { font-size: 0.72rem; color: #94a3b8; text-transform: uppercase;
+                         letter-spacing: .06em; }
+
+        /* Alert banner */
+        .alert {
+            display: none; margin-top: 12px;
+            background: #450a0a; border: 1px solid #ef4444;
+            color: #fca5a5; border-radius: 8px; padding: 10px 14px;
+            font-weight: 600; font-size: 0.9rem; text-align: center;
+        }
+        .alert.show { display: block; }
+
+        /* ══════════════════════════════════
+           BOTTOM ZONE  —  3-column flex row
+           ══════════════════════════════════ */
+        .bottom-zone {
+            display: flex; gap: 16px; align-items: flex-start;
+        }
+        .chart-card  { flex: 2; min-width: 0; }
+        .system-card { flex: 1.4; min-width: 0; }
+
+        /* Chart containers */
+        .chart-container { position: relative; height: 180px; }
+
+        /* System grid */
+        .system-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+        }
+        .metric-value { font-size: 1.6rem; font-weight: 700; color: #fff;
+                        font-variant-numeric: tabular-nums; }
+        .metric-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase;
+                        letter-spacing: .05em; margin-top: 2px; }
+
+        /* Controls row */
+        .controls { display: flex; align-items: center; gap: 12px; }
+        .btn { border: none; border-radius: 8px; padding: 8px 16px;
+               font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+
+        /* Video container */
+        .video-container {
+            background: #0d1117; border: 1px dashed #2d3748; border-radius: 10px;
+            min-height: 80px; display: flex; align-items: center; justify-content: center;
+            color: #475569; font-size: 0.85rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .top-zone, .bottom-zone { flex-direction: column; }
+            .detectors-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 500px) {
+            .detectors-grid { grid-template-columns: repeat(2, 1fr); }
+            .comfort-grid   { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -27,84 +179,117 @@
             </div>
         </div>
         
-        <div class="dashboard">
-            <!-- Environmental Sensors -->
-            <div class="card">
-                <h3>🌡️ Environmental Sensors</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div>
-                        <div class="metric-value" id="temperature">--</div>
-                        <div class="metric-label">Temperature (°C)</div>
+        <!-- ═══════════════════════════════════════════
+             ВЕРХНЯЯ ЗОНА — детекторы + датчики комфорта
+             ═══════════════════════════════════════════ -->
+        <div class="top-zone">
+
+            <!-- Детекторы тревоги -->
+            <div class="card detectors-card">
+                <h3>🔔 Детекторы</h3>
+                <div class="detectors-grid">
+
+                    <div class="detector-item" id="det-motion">
+                        <div class="detector-icon">📹</div>
+                        <div class="detector-label">Движение</div>
+                        <div class="detector-value" id="motionStatus">--</div>
+                        <div class="detector-sub" id="motionLevel">--</div>
                     </div>
-                    <div>
-                        <div class="metric-value" id="humidity">--</div>
-                        <div class="metric-label">Humidity (%)</div>
+
+                    <div class="detector-item" id="det-voice">
+                        <div class="detector-icon">🎙️</div>
+                        <div class="detector-label">Голос</div>
+                        <div class="detector-value" id="voiceActivity">--</div>
+                        <div class="detector-sub" id="noiseLevel">--</div>
                     </div>
-                    <div>
-                        <div class="metric-value" id="lightLevel">--</div>
-                        <div class="metric-label">Light Level</div>
+
+                    <div class="detector-item" id="det-cry">
+                        <div class="detector-icon">😢</div>
+                        <div class="detector-label">Плач</div>
+                        <div class="detector-value" id="babyCrying">--</div>
+                        <div class="detector-sub">&nbsp;</div>
                     </div>
-                    <div>
-                        <div class="metric-value" id="motionStatus">--</div>
-                        <div class="metric-label">Motion</div>
+
+                    <div class="detector-item" id="det-scream">
+                        <div class="detector-icon">🔴</div>
+                        <div class="detector-label">Крик</div>
+                        <div class="detector-value" id="screaming">--</div>
+                        <div class="detector-sub">&nbsp;</div>
                     </div>
+
+                </div>
+                <!-- Объединённый алерт -->
+                <div class="alert" id="audioAlert"></div>
+                <div class="alert" id="motionAlert"></div>
+            </div>
+
+            <!-- Датчики комфорта -->
+            <div class="card comfort-card">
+                <h3>🌡️ Условия в комнате</h3>
+                <div class="comfort-grid">
+
+                    <div class="comfort-item">
+                        <div class="comfort-icon">🌡️</div>
+                        <div class="comfort-big" id="temperature">--</div>
+                        <div class="comfort-unit">°C</div>
+                        <div class="comfort-label">Температура</div>
+                    </div>
+
+                    <div class="comfort-item">
+                        <div class="comfort-icon">💧</div>
+                        <div class="comfort-big" id="humidity">--</div>
+                        <div class="comfort-unit">%</div>
+                        <div class="comfort-label">Влажность</div>
+                    </div>
+
+                    <div class="comfort-item">
+                        <div class="comfort-icon">💡</div>
+                        <div class="comfort-big" id="lightLevel">--</div>
+                        <div class="comfort-unit">lux</div>
+                        <div class="comfort-label">Освещённость</div>
+                    </div>
+
                 </div>
             </div>
-            
-            <!-- Audio Analysis -->
-            <div class="card">
-                <h3>🎵 Audio Analysis</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div>
-                        <div class="metric-value" id="noiseLevel">--</div>
-                        <div class="metric-label">Noise Level</div>
-                    </div>
-                    <div>
-                        <div class="metric-value" id="voiceActivity">--</div>
-                        <div class="metric-label">Voice Activity</div>
-                    </div>
-                    <div>
-                        <div class="metric-value" id="babyCrying">--</div>
-                        <div class="metric-label">Baby Crying</div>
-                    </div>
-                    <div>
-                        <div class="metric-value" id="screaming">--</div>
-                        <div class="metric-label">Screaming</div>
-                    </div>
-                </div>
+
+        </div><!-- /top-zone -->
+
+        <!-- ═══════════════════════════════════════════
+             НИЖНЯЯ ЗОНА — графики + система + видео
+             ═══════════════════════════════════════════ -->
+        <div class="bottom-zone">
+
+            <!-- График уровня шума -->
+            <div class="card chart-card">
+                <h3>🎵 Уровень шума</h3>
                 <div class="chart-container">
                     <canvas id="audioChart"></canvas>
                 </div>
-                <div class="alert" id="audioAlert"></div>
             </div>
-            
-            <!-- Video Monitoring -->
-            <div class="card">
-                <h3>📹 Video Monitoring</h3>
-                <div class="video-container" id="videoContainer">
-                    <span>Video Feed - No Connection</span>
-                </div>
-                <div class="controls">
-                    <button class="btn btn-primary" id="startBtn">Start Analysis</button>
-                    <button class="btn btn-danger" id="stopBtn" disabled>Stop Analysis</button>
-                    <button class="btn btn-primary" id="snapshotBtn">Snapshot</button>
-                </div>
+
+            <!-- График движения -->
+            <div class="card chart-card">
+                <h3>📹 Уровень движения</h3>
                 <div class="chart-container">
                     <canvas id="motionChart"></canvas>
                 </div>
+                <div class="controls" style="margin-top:12px;">
+                    <button class="btn btn-primary" id="snapshotBtn">📷 Snapshot</button>
+                    <span class="status-indicator" id="videoStatus">🎥 Analysis Active</span>
+                </div>
             </div>
-            
-            <!-- System Status -->
-            <div class="card">
-                <h3>⚙️ System Status</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+
+            <!-- Системный статус -->
+            <div class="card system-card">
+                <h3>⚙️ Система</h3>
+                <div class="system-grid">
                     <div>
                         <div class="metric-value" id="cpuUsage">--</div>
-                        <div class="metric-label">CPU Usage (%)</div>
+                        <div class="metric-label">CPU (%)</div>
                     </div>
                     <div>
                         <div class="metric-value" id="memoryUsage">--</div>
-                        <div class="metric-label">Memory Usage (%)</div>
+                        <div class="metric-label">RAM (%)</div>
                     </div>
                     <div>
                         <div class="metric-value" id="fps">--</div>
@@ -115,11 +300,16 @@
                         <div class="metric-label">Uptime</div>
                     </div>
                 </div>
-                <div class="chart-container">
+                <div class="chart-container" style="height:120px; margin-top:12px;">
                     <canvas id="systemChart"></canvas>
                 </div>
+                <!-- Видео-контейнер внизу системной карты -->
+                <div class="video-container" id="videoContainer" style="margin-top:12px;">
+                    <span>Video Feed - No Connection</span>
+                </div>
             </div>
-        </div>
+
+        </div><!-- /bottom-zone -->
     </div>
 
     <script>
@@ -164,8 +354,9 @@
                 Promise.all([
                     fetch('/sensors/i2c').then(r => r.json()),
                     fetch('/audio/status').then(r => r.json()),
+                    fetch('/video/status').then(r => r.json()),
                     fetch('/system/status').then(r => r.json())
-                ]).then(([sensorData, audioData, systemData]) => {
+                ]).then(([sensorData, audioData, videoData, systemData]) => {
                     this.updateCount++;
                     this.lastUpdateTime = Date.now();
                     
@@ -174,6 +365,7 @@
                         callback({
                             sensor: sensorData,
                             audio: audioData,
+                            video: videoData,
                             system: systemData,
                             timestamp: this.lastUpdateTime
                         });
@@ -203,7 +395,7 @@
         }
         
         // Initialize protocol client
-        const protocolClient = new ProtocolClient(8081);
+        const protocolClient = new ProtocolClient(8082);
         
         // Chart instances
         let audioChart, motionChart, systemChart;
@@ -297,72 +489,116 @@
         
         // Update display with real data
         function updateDisplay(data) {
-            // Update connection status
+            // Connection status
             const statusDot = document.getElementById('connectionStatus');
-            const connectionText = document.getElementById('connectionText');
-            const protocolInfo = document.getElementById('protocolInfo');
-            
             statusDot.classList.add('connected');
-            connectionText.textContent = 'Connected';
-            protocolInfo.textContent = `Protocol: Connected (Port ${protocolClient.port})`;
-            
-            // Calculate update rate
-            const updateRate = protocolClient.updateCount > 0 ? 
+            document.getElementById('connectionText').textContent = 'Connected';
+            document.getElementById('protocolInfo').textContent = `Protocol: Connected (Port ${protocolClient.port})`;
+            const updateRate = protocolClient.updateCount > 0 ?
                 (protocolClient.updateCount / ((Date.now() - protocolClient.lastUpdateTime) / 1000)).toFixed(1) : '--';
             document.getElementById('updateRate').textContent = `Update Rate: ${updateRate} Hz`;
-            
-            // Update sensor data
+
+            // ── Comfort sensors (top right) ──────────────────────────────
             if (data.sensor) {
                 document.getElementById('temperature').textContent = data.sensor.temperature.toFixed(1);
-                document.getElementById('humidity').textContent = data.sensor.humidity.toFixed(1);
-                document.getElementById('lightLevel').textContent = data.sensor.light;
-                document.getElementById('motionStatus').textContent = data.sensor.motion ? 'YES' : 'NO';
+                document.getElementById('humidity').textContent    = data.sensor.humidity.toFixed(1);
+                document.getElementById('lightLevel').textContent  = data.sensor.light;
             }
-            
-            // Update audio data
+
+            // ── Motion detector (top left panel) ─────────────────────────
+            if (data.video) {
+                const motionLevelText = data.video.motion_prob > 0.8 ? 'ОЧЕНЬ ВЫСОКИЙ' :
+                                        data.video.motion_prob > 0.5 ? 'ВЫСОКИЙ' :
+                                        data.video.motion_prob > 0.2 ? 'СРЕДНИЙ' :
+                                        data.video.motion_prob > 0.05 ? 'НИЗКИЙ' : 'НЕТ';
+                const detected = data.video.motion_detected;
+                document.getElementById('motionStatus').textContent = detected ? 'ОБНАРУЖЕНО' : 'НЕТ';
+                document.getElementById('motionLevel').textContent  = motionLevelText;
+
+                const detMotion = document.getElementById('det-motion');
+                detMotion.classList.toggle('alert-on', detected);
+                detMotion.classList.toggle('active',   !detected && data.video.motion_prob > 0.05);
+
+                const motionAlert = document.getElementById('motionAlert');
+                if (detected) {
+                    motionAlert.textContent = '🚨 Обнаружено движение!';
+                    motionAlert.classList.add('show');
+                } else {
+                    motionAlert.classList.remove('show');
+                }
+
+                // Motion chart
+                if (motionChart) {
+                    motionChart.data.labels.push('');
+                    motionChart.data.datasets[0].data.push(data.video.motion_prob || 0);
+                    if (motionChart.data.labels.length > 40) {
+                        motionChart.data.labels.shift();
+                        motionChart.data.datasets[0].data.shift();
+                    }
+                    motionChart.update('none');
+                }
+            }
+
+            // ── Audio detector (top left panel) ──────────────────────────
             if (data.audio) {
-                document.getElementById('noiseLevel').textContent = data.audio.noise_level.toFixed(3);
-                document.getElementById('voiceActivity').textContent = data.audio.voice_activity ? 'ACTIVE' : 'QUIET';
-                document.getElementById('babyCrying').textContent = data.audio.baby_crying ? 'YES' : 'NO';
-                document.getElementById('screaming').textContent = data.audio.screaming ? 'YES' : 'NO';
-                
-                // Check for alerts
+                const voiceActive = data.audio.voice_activity;
+                const crying      = data.audio.baby_crying;
+                const scream      = data.audio.screaming;
+
+                document.getElementById('voiceActivity').textContent = voiceActive ? 'АКТИВЕН' : 'ТИХО';
+                document.getElementById('noiseLevel').textContent    = `${(data.audio.noise_level * 100).toFixed(0)}%`;
+                document.getElementById('babyCrying').textContent    = crying ? 'ДА' : 'НЕТ';
+                document.getElementById('screaming').textContent     = scream  ? 'ДА' : 'НЕТ';
+
+                // Highlight detector tiles
+                const detVoice = document.getElementById('det-voice');
+                detVoice.classList.toggle('active',   voiceActive && !crying);
+                detVoice.classList.toggle('alert-on', crying || scream);
+
+                const detCry = document.getElementById('det-cry');
+                detCry.classList.toggle('alert-on', crying);
+
+                const detScream = document.getElementById('det-scream');
+                detScream.classList.toggle('alert-on', scream);
+
                 const audioAlert = document.getElementById('audioAlert');
-                if (data.audio.baby_crying || data.audio.screaming) {
-                    audioAlert.textContent = data.audio.baby_crying ? '🚨 Baby Crying Detected!' : '🚨 Screaming Detected!';
+                if (scream) {
+                    audioAlert.textContent = '🚨 Обнаружен крик!';
+                    audioAlert.classList.add('show');
+                } else if (crying) {
+                    audioAlert.textContent = '😢 Ребёнок плачет!';
                     audioAlert.classList.add('show');
                 } else {
                     audioAlert.classList.remove('show');
                 }
-                
-                // Update audio chart
+
+                // Audio chart
                 if (audioChart) {
                     audioChart.data.labels.push('');
                     audioChart.data.datasets[0].data.push(data.audio.noise_level);
-                    if (audioChart.data.labels.length > 20) {
+                    if (audioChart.data.labels.length > 40) {
                         audioChart.data.labels.shift();
                         audioChart.data.datasets[0].data.shift();
                     }
                     audioChart.update('none');
                 }
             }
-            
-            // Update system data
+
+            // ── System (bottom right) ─────────────────────────────────────
             if (data.system) {
-                document.getElementById('cpuUsage').textContent = data.system.cpu_usage;
+                document.getElementById('cpuUsage').textContent    = data.system.cpu_usage;
                 document.getElementById('memoryUsage').textContent = data.system.memory_usage;
-                document.getElementById('fps').textContent = data.system.fps;
-                
-                const uptimeHours = Math.floor(data.system.uptime / 3600);
-                const uptimeMinutes = Math.floor((data.system.uptime % 3600) / 60);
-                document.getElementById('uptime').textContent = `${uptimeHours}h ${uptimeMinutes}m`;
-                
-                // Update system chart
+                document.getElementById('fps').textContent         = data.system.fps;
+
+                const h = Math.floor(data.system.uptime / 3600);
+                const m = Math.floor((data.system.uptime % 3600) / 60);
+                document.getElementById('uptime').textContent = `${h}h ${m}m`;
+
                 if (systemChart) {
                     systemChart.data.labels.push('');
                     systemChart.data.datasets[0].data.push(data.system.cpu_usage);
                     systemChart.data.datasets[1].data.push(data.system.memory_usage);
-                    if (systemChart.data.labels.length > 20) {
+                    if (systemChart.data.labels.length > 40) {
                         systemChart.data.labels.shift();
                         systemChart.data.datasets[0].data.shift();
                         systemChart.data.datasets[1].data.shift();
@@ -373,20 +609,6 @@
         }
         
         // Control handlers
-        document.getElementById('startBtn').addEventListener('click', () => {
-            protocolClient.sendCommand('start', 'camera', 0, 0);
-            document.getElementById('startBtn').disabled = true;
-            document.getElementById('stopBtn').disabled = false;
-            document.getElementById('videoContainer').innerHTML = '<span>🎥 Analysis Active</span>';
-        });
-        
-        document.getElementById('stopBtn').addEventListener('click', () => {
-            protocolClient.sendCommand('stop', 'camera', 0, 0);
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-            document.getElementById('videoContainer').innerHTML = '<span>Video Feed - Stopped</span>';
-        });
-        
         document.getElementById('snapshotBtn').addEventListener('click', () => {
             protocolClient.sendCommand('snapshot', 'camera', 0, 0);
             console.log('Snapshot requested');
@@ -395,6 +617,10 @@
         // Initialize application
         document.addEventListener('DOMContentLoaded', () => {
             initCharts();
+            
+            // Auto-start video analysis
+            protocolClient.sendCommand('start', 'camera', 0, 0);
+            document.getElementById('videoContainer').innerHTML = '<span>🎥 Analysis Active</span>';
             
             // Connect to protocol server
             if (protocolClient.connect()) {

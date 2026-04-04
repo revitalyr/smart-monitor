@@ -29,6 +29,7 @@ typedef void (*audio_toggle_callback_t)(bool enable);
 typedef char* (*sensor_json_callback_t)(void);
 typedef char* (*audio_json_callback_t)(void);
 typedef char* (*system_json_callback_t)(void);
+typedef char* (*video_json_callback_t)(void);
 
 typedef struct {
     motion_events_count_t m_motion_events;
@@ -62,6 +63,7 @@ void http_server_set_i2c_toggle_callback(http_server_t* server, i2c_toggle_callb
 void http_server_set_sensor_data_callback(http_server_t* server, sensor_json_callback_t callback);
 void http_server_set_audio_data_callback(http_server_t* server, audio_json_callback_t callback);
 void http_server_set_system_data_callback(http_server_t* server, system_json_callback_t callback);
+void http_server_set_video_data_callback(http_server_t* server, video_json_callback_t callback);
 
 metrics_data_t* http_server_get_metrics(http_server_t* server);
 

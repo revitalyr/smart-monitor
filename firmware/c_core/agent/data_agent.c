@@ -35,6 +35,7 @@ struct data_agent {
     // HTTP server JSON callbacks
     char* (*sensor_json_callback)(void);
     char* (*audio_json_callback)(void);
+    char* (*video_json_callback)(void);
     char* (*system_json_callback)(void);
     
     // Internal state
@@ -537,6 +538,12 @@ void data_agent_set_http_callbacks(data_agent_t* agent,
     agent->system_json_callback = system_cb;
 }
 
+void data_agent_set_video_callback(data_agent_t* agent, char* (*video_cb)(void)) {
+    if (!agent) return;
+    
+    agent->video_json_callback = video_cb;
+}
+
 char* data_agent_get_sensor_json(data_agent_t* agent) {
     if (!agent || !agent->sensor_json_callback) return NULL;
     return agent->sensor_json_callback();
@@ -545,6 +552,11 @@ char* data_agent_get_sensor_json(data_agent_t* agent) {
 char* data_agent_get_audio_json(data_agent_t* agent) {
     if (!agent || !agent->audio_json_callback) return NULL;
     return agent->audio_json_callback();
+}
+
+char* data_agent_get_video_json(data_agent_t* agent) {
+    if (!agent || !agent->video_json_callback) return NULL;
+    return agent->video_json_callback();
 }
 
 char* data_agent_get_system_json(data_agent_t* agent) {

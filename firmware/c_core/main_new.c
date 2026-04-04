@@ -77,6 +77,13 @@ static char* http_audio_handler(void) {
     return strdup("{\"error\":\"data_agent_not_available\"}");
 }
 
+static char* http_video_handler(void) {
+    if (g_data_agent) {
+        return data_agent_get_video_json(g_data_agent);
+    }
+    return strdup("{\"error\":\"data_agent_not_available\"}");
+}
+
 static char* http_system_handler(void) {
     if (g_data_agent) {
         return data_agent_get_system_json(g_data_agent);
@@ -220,6 +227,7 @@ int main(int argc, char* argv[]) {
     // Set HTTP handlers
     http_server_set_sensor_data_callback(g_http_server, http_sensor_handler);
     http_server_set_audio_data_callback(g_http_server, http_audio_handler);
+    http_server_set_video_data_callback(g_http_server, http_video_handler);
     http_server_set_system_data_callback(g_http_server, http_system_handler);
     
     // Initialize data agent HTTP callbacks
@@ -227,6 +235,9 @@ int main(int argc, char* argv[]) {
                                   generate_sensor_json, 
                                   generate_audio_json, 
                                   generate_system_json);
+    
+    // Set video callback using the function
+    data_agent_set_video_callback(g_data_agent, generate_video_json);
     
     printf("HTTP server created successfully\n");
     
