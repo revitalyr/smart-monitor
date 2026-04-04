@@ -57,6 +57,15 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/core)
     add_subdirectory(src/core)
 endif()
 
+# Add core module subdirectories
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/core/video)
+    add_subdirectory(src/core/video)
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/core/ffi)
+    add_subdirectory(src/core/ffi)
+endif()
+
 if(BUILD_RUST AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/rust)
     add_subdirectory(src/rust)
 endif()
@@ -114,6 +123,18 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/core/main.c)
 
     if(TARGET smart_monitor_communication)
         list(APPEND LINK_LIBS smart_monitor_communication)
+    endif()
+
+    if(TARGET smart_monitor_video)
+        list(APPEND LINK_LIBS smart_monitor_video)
+    endif()
+
+    if(TARGET smart_monitor_gstreamer)
+        list(APPEND LINK_LIBS smart_monitor_gstreamer)
+    endif()
+
+    if(TARGET smart_monitor_ffi)
+        list(APPEND LINK_LIBS smart_monitor_ffi)
     endif()
 
     if(TARGET smart_monitor_audio)

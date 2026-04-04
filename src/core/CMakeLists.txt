@@ -29,6 +29,16 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/common/globals.c)
     message(STATUS "Found globals.c")
 endif()
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/video/v4l2_capture.c)
+    list(APPEND CORE_SOURCES video/v4l2_capture.c)
+    message(STATUS "Found v4l2_capture.c")
+endif()
+
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ffi/rust_bridge.c)
+    list(APPEND CORE_SOURCES ffi/rust_bridge_mock.c)
+    message(STATUS "Found rust_bridge_mock.c")
+endif()
+
 # Create individual module libraries
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/agent/data_agent.c)
     add_library(smart_monitor_agent STATIC agent/data_agent.c)
