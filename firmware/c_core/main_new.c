@@ -39,9 +39,15 @@ static const int DEFAULT_PORT = 8080;
 static const int DEFAULT_PROTOCOL_PORT = 8082;
 
 // Signal handlers
+static volatile sig_atomic_t g_shutdown_requested = 0;
+
 static void signal_handler(int sig) {
     printf("\nReceived signal %d, shutting down gracefully...\n", sig);
+    g_shutdown_requested = 1;
     g_running = false;
+    
+    // Reinstall signal handler for subsequent signals
+    signal(sig, signal_handler);
 }
 
 // Print usage information
@@ -264,12 +270,13 @@ int main(int argc, char* argv[]) {
     printf("\nPress Ctrl+C to stop...\n");
     
     // Main loop
-    while (g_running) {
-        sleep(1);
+    while (g_running && !g_shutdown_requested) {
+        // Use shorter sleep for faster response to signals
+        usleep(100000); // 100ms instead of 1s
         
         // Print statistics every 10 seconds
         static int stats_counter = 0;
-        if (++stats_counter >= 10) {
+        if (++stats_counter >= 100) { // 100 * 100ms = 10s
             stats_counter = 0;
             
             // Data agent statistics
@@ -286,6 +293,9 @@ int main(int argc, char* argv[]) {
     }
     
 cleanup:
+    if (g_shutdown_requested) {
+        printf("\nShutdown requested by user\n");
+    }
     printf("\nShutting down...\n");
     
     // Stop services
