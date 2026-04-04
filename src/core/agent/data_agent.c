@@ -18,7 +18,7 @@ struct data_agent {
     
     // Component instances
     v4l2_capture_t* camera;
-    audio_capture_t* audio;
+    AudioCapture* audio;
     noise_detector_t* noise_detector;
     MotionDetector* motion_detector;
     

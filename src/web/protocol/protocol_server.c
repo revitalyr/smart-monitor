@@ -192,7 +192,7 @@ static void* accept_thread_func(void* arg) {
             }
             
             // Initialize client
-            client_connection_t* client = &server->clients[slot];
+            ClientConnection* client = &server->clients[slot];
             client->socket_fd = client_fd;
             client->address = client_addr;
             client->last_activity = get_timestamp_ms();
@@ -307,7 +307,7 @@ ProtocolServer* protocol_server_create(const ServerConfig* config) {
     return server;
 }
 
-void protocol_server_destroy(protocol_server_t* server) {
+void protocol_server_destroy(ProtocolServer* server) {
     if (!server) return;
     
     protocol_server_stop(server);
@@ -320,7 +320,7 @@ void protocol_server_destroy(protocol_server_t* server) {
     free(server);
 }
 
-bool protocol_server_start(protocol_server_t* server) {
+bool protocol_server_start(ProtocolServer* server) {
     if (!server || server->running) return false;
     
     // Start listening
@@ -342,7 +342,7 @@ bool protocol_server_start(protocol_server_t* server) {
     return true;
 }
 
-void protocol_server_stop(protocol_server_t* server) {
+void protocol_server_stop(ProtocolServer* server) {
     if (!server || !server->running) return;
     
     server->running = false;

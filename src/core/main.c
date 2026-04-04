@@ -54,27 +54,27 @@ typedef struct {
     FrameCount motion_events;           /**< Total count of detected motion events */
     MotionLevel motion_level;           /**< Current intensity of motion (0.0 - 1.0) */
     FrameCount frames_processed;        /**< Total video frames processed */
-    float frame_processing_latency_ms;  /**< Time taken to process the last frame */
-    bool camera_active;                 /**< Flag indicating if camera capture is running */
+    LatencyMs frame_processing_latency_ms;  /**< Time taken to process the last frame */
+    bool camera_active;                       /**< Flag indicating if camera capture is running */
 
-    float temperature_c;               /**< I2C Temperature sensor reading (°C) */
-    float humidity_percent;             /**< I2C Humidity sensor reading (%) */
-    uint16_t light_lux;                /**< I2C Ambient light level (Lux) */
-    bool pir_motion_detected;          /**< I2C PIR sensor motion detection flag */
+    TemperatureC temperature_c;              /**< I2C Temperature sensor reading (°C) */
+    HumidityPercent humidity_percent;        /**< I2C Humidity sensor reading (%) */
+    LightLux light_lux;                      /**< I2C Ambient light level (Lux) */
+    bool pir_motion_detected;                /**< I2C PIR sensor motion detection flag */
 
-    int16_t acc_x, acc_y, acc_z;       /**< SPI Accelerometer raw data */
+    AccelerometerAxis acc_x, acc_y, acc_z;   /**< SPI Accelerometer raw data */
     
-    MotionLevel audio_level;            /**< RMS audio noise level */
-    bool audio_alert;                   /**< Flag indicating significant noise detection */
+    MotionLevel audio_level;                 /**< RMS audio noise level */
+    bool audio_alert;                        /**< Flag indicating significant noise detection */
 
     // ESP32 data (UART/BLE)
-    float esp32_temperature_c;
-    float esp32_humidity_percent;
-    uint8_t battery_percent;
+    TemperatureC esp32_temperature_c;
+    HumidityPercent esp32_humidity_percent;
+    BatteryPercent battery_percent;
 
     // System metrics
-    uint8_t cpu_usage_percent;
-    uint8_t memory_usage_percent;
+    CpuUsagePercent cpu_usage_percent;
+    MemoryUsagePercent memory_usage_percent;
 } MonitorPacket;
 #pragma pack(pop)
 

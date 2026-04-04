@@ -101,6 +101,20 @@ typedef uint8_t DeviceState;       /**< Device operational state */
 typedef uint8_t ConnectionState;   /**< Network connection state */
 typedef uint8_t ErrorCode;         /**< Error code from operations */
 
+// --- Sensor Data Types ---
+typedef float TemperatureC;       /**< Temperature in Celsius */
+typedef float HumidityPercent;     /**< Humidity percentage */
+typedef uint16_t LightLux;         /**< Light level in Lux */
+typedef uint8_t BatteryPercent;    /**< Battery percentage */
+typedef uint8_t CpuUsagePercent;   /**< CPU usage percentage */
+typedef uint8_t MemoryUsagePercent; /**< Memory usage percentage */
+
+// --- Accelerometer Types ---
+typedef int16_t AccelerometerAxis; /**< Accelerometer axis reading */
+
+// --- Processing Latency Types ---
+typedef float LatencyMs;           /**< Processing latency in milliseconds */
+
 // =============================================================================
 // SYSTEM STATES ENUMERATIONS
 // =============================================================================
