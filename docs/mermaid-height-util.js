@@ -81,64 +81,41 @@ class MermaidHeightAdjuster {
      * Render Mermaid diagram for a specific tab
      */
     async renderDiagramForTab(tabName) {
-        const diagramId = `${tabName}-diagram`;
-        const container = document.getElementById(diagramId);
-        
-        if (!container) {
-            console.warn(`Diagram container not found: ${diagramId}`);
+        const tabPane = document.getElementById(tabName);
+        if (!tabPane) {
+            console.warn(`Tab pane not found: ${tabName}`);
             return;
         }
 
-        const diagramCode = this.getDiagramCode(tabName);
-        if (!diagramCode) {
-            console.warn(`No diagram code found for tab: ${tabName}`);
-            return;
-        }
-
-        // Clear existing content
-        container.innerHTML = '';
+        // Find all mermaid diagrams in this tab
+        const mermaidElements = tabPane.querySelectorAll('.mermaid');
         
-        // Create temporary div for Mermaid rendering
-        const tempDiv = document.createElement('div');
-        tempDiv.style.visibility = 'hidden';
-        tempDiv.innerHTML = `<div class="mermaid">${diagramCode}</div>`;
-        container.appendChild(tempDiv);
-
-        try {
-            // Wait a bit for DOM to update
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // Render the diagram
-            const svgElement = await mermaid.run({
-                nodes: tempDiv
-            });
-            
-            // Clear temporary content and add the rendered SVG
-            container.innerHTML = '';
-            if (svgElement && svgElement.length > 0) {
-                container.appendChild(svgElement[0]);
+        for (const element of mermaidElements) {
+            try {
+                // Wait a bit for DOM to update
+                await new Promise(resolve => setTimeout(resolve, 100));
                 
-                // Apply saved scale or default
-                const savedScale = this.scales.get(diagramId) || this.defaultScale;
-                this.applyScale(container, savedScale);
+                // Render the diagram
+                const svgElements = await mermaid.run({
+                    nodes: [element]
+                });
                 
-                // Adjust container height
-                this.adjustDiagram(container);
+                if (svgElements && svgElements.length > 0) {
+                    // Apply saved scale or default
+                    const container = element.closest('.diagram-container');
+                    if (container) {
+                        const savedScale = this.scales.get(container.id) || this.defaultScale;
+                        this.applyScale(container, savedScale);
+                        
+                        // Adjust container height
+                        this.adjustDiagram(container);
+                    }
+                }
+            } catch (error) {
+                console.error('Error rendering Mermaid diagram:', error);
+                element.innerHTML = `<div style="color: #dc3545; padding: 20px;">Error rendering diagram: ${error.message}</div>`;
             }
-        } catch (error) {
-            console.error('Error rendering Mermaid diagram:', error);
-            container.innerHTML = `<div style="color: #dc3545; padding: 20px;">Error rendering diagram: ${error.message}</div>`;
         }
-    }
-
-    /**
-     * Get diagram code for a specific tab
-     */
-    getDiagramCode(tabName) {
-        if (typeof diagrams !== 'undefined' && diagrams[tabName]) {
-            return diagrams[tabName];
-        }
-        return null;
     }
 
     /**
@@ -233,8 +210,7 @@ class MermaidHeightAdjuster {
      * Get diagram ID from container
      */
     getDiagramId(container) {
-        const diagramDiv = container.querySelector('[id$="-diagram"]');
-        return diagramDiv ? diagramDiv.id : null;
+        return container.id || null;
     }
 }
 
