@@ -6,9 +6,10 @@
  * and runs the main processing loop for video and sensor data.
  */
 #include "video/v4l2_capture.h"
-#include "net/http_server.h"
-#include "net/webrtc_server.h"
+#include "../web/api/http_server.h"
+#include "../web/webrtc/webrtc_server.h"
 #include "ffi/rust_bridge.h"
+#include "comm/uart_interface.h"
 
 #ifdef ENABLE_AUDIO
 #include "audio/audio_capture.h"

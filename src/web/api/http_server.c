@@ -1,5 +1,5 @@
 #include "http_server.h"
-#include "../firmware/c_core/common/smart_monitor_constants.h"
+#include "../../core/common/smart_monitor_constants.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

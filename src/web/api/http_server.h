@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "../common/smart_monitor_constants.h"
+#include "../../core/common/smart_monitor_constants.h"
 
 #ifdef __cplusplus
 extern "C" {

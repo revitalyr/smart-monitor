@@ -1,0 +1,38 @@
+cmake_minimum_required(VERSION 3.16)
+project(smart_monitor VERSION 1.0.0 LANGUAGES C CXX)
+
+# Set C and C++ standards
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Build options
+option(BUILD_TESTS "Build tests" OFF)
+option(ENABLE_SIMULATION "Enable simulation mode" ON)
+
+# Testing packages
+if(BUILD_TESTS)
+    find_package(GTest REQUIRED)
+    enable_testing()
+endif()
+
+# Include directories
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/core/common)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/core)
+
+# Tests only - minimal dependencies
+if(BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
+
+# Create a simple test executable for verification
+add_executable(test_runner tests/unit/test_sanity.cpp)
+
+if(BUILD_TESTS)
+    target_link_libraries(test_runner
+        ${GTEST_LIBRARIES}
+        ${GTEST_MAIN_LIBRARIES}
+        pthread
+    )
+endif()

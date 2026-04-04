@@ -1,355 +1,195 @@
-# Smart Monitor - Embedded Video Analytics System
+# Smart Monitor - IoT Baby Monitoring System
 
-## 🎯 Features
+A comprehensive IoT baby monitoring system with real-time audio/video analysis, sensor integration, and web-based dashboard.
 
-✅ **Video Input**: V4L2 camera support with mock mode for WSL/testing  
-✅ **Motion Detection**: Rust-based adaptive motion detection with noise compensation  
-✅ **Streaming**: HTTP REST API with WebRTC ready infrastructure  
-✅ **Metrics**: Real-time motion events, sleep/activity tracking  
-✅ **Control**: CLI interface + Web dashboard  
-✅ **Production Ready**: systemd service, cross-compilation support  
-
-## 🏗️ Architecture
+## 🏗️ Project Structure
 
 ```
-                +----------------------+
-                |   Camera (V4L2)     |
-                |   Mock Mode Support    |
-                +----------+-----------+
-                           |
-                           v
-                +----------------------+
-                |   Video Pipeline     |
-                | (C + Rust FFI)        |
-                +----------+-----------+
-                           |
-          +----------------+----------------+
-          |                                 |
-          v                                 v
-+-------------------+           +----------------------+
-| Motion Detection  |           |   Metrics Engine     |
-| (Rust module)     |           | (Real-time tracking)   |
-+-------------------+           +----------------------+
-          |                                 |
-          +----------------+----------------+
-                           v
-                +----------------------+
-                |   Network Layer      |
-                | (HTTP/REST/WebRTC)    |
-                +----------+-----------+
-                           |
-                           v
-                +----------------------+
-                |   CLI / Web UI       |
-                +----------------------+
+smart-monitor/
+├── src/                          # Source code
+│   ├── core/                     # Core C/C++ functionality
+│   │   ├── agent/                # Data agent and state machine
+│   │   ├── audio/                # Audio processing
+│   │   ├── video/                # Video processing
+│   │   ├── sensors/              # Sensor interfaces
+│   │   ├── communication/        # Communication protocols
+│   │   ├── hardware/             # Hardware abstraction
+│   │   ├── ffi/                 # Foreign function interface
+│   │   └── common/              # Shared utilities
+│   │
+│   ├── rust/                    # Rust modules
+│   │   ├── motion_detection/     # Motion detection algorithms
+│   │   ├── image_processing/    # Image processing utilities
+│   │   └── shared/             # Shared Rust utilities
+│   │
+│   └── web/                     # Web server code
+│       ├── api/                 # HTTP API server
+│       ├── protocol/            # Protocol server
+│       └── webrtc/             # WebRTC functionality
+│
+├── web/                         # Web frontend
+│   ├── static/                  # Static web files
+│   │   ├── css/
+│   │   ├── js/
+│   │   └── index.html
+│   └── assets/                  # Images, videos, etc.
+│
+├── docs/                        # Documentation
+│   ├── api/                     # API documentation
+│   ├── architecture/             # Architecture docs
+│   └── user_guide/              # User documentation
+│
+├── scripts/                     # Build and utility scripts
+│   ├── build/                   # Build scripts
+│   ├── deploy/                  # Deployment scripts
+│   ├── test/                    # Testing scripts
+│   └── utils/                   # Utility scripts
+│
+├── config/                      # Configuration files
+│   ├── cmake/                   # CMake modules
+│   ├── docker/                  # Docker configurations
+│   └── systemd/                 # Systemd service files
+│
+└── tests/                       # Test files
+    ├── unit/
+    ├── integration/
+    └── fixtures/
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install cmake build-essential pkg-config
-sudo apt install libv4l-dev libasound2-dev
-sudo apt install rustc cargo
 
-# WSL users - mock mode works without /dev/video0
-```
+- Linux system (Ubuntu 20.04+ recommended)
+- CMake 3.16+
+- GCC 9+ or Clang 10+
+- Rust 1.70+ (if building Rust components)
+- GStreamer 1.16+
+- OpenCV 4.0+
 
-### Build & Run
+### Build
+
 ```bash
-# Clone and build
-git clone <repo>
+# Clone the repository
+git clone <repository-url>
 cd smart-monitor
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
 
-# Run application
-./build/firmware/c_core/smart_monitor
+# Create build directory
+mkdir build && cd build
+
+# Configure with CMake
+cmake .. -DBUILD_RUST=ON -DBUILD_TESTS=ON
+
+# Build
+make -j$(nproc)
+
+# Install (optional)
+sudo make install
 ```
 
-### Web Interface
-Open http://localhost:8080 for:
-- 📹 Live video feed (mock mode with animated test pattern)
-- 🎛️ Motion detection controls
-- 📊 Real-time metrics dashboard
-- 🔄 Start/Stop analysis controls
+### Run
 
-## 📡 API Endpoints
-
-### REST API
 ```bash
-# Health check
-GET /health
+# Run the main application
+./smart_monitor
 
-# Real-time metrics
-GET /metrics
-
-# Start video analysis
-POST /analyze/video
-Body: {"url": "video_url_or_mock"}
-
-# Analysis status
-GET /analyze/status
-
-# WebRTC SDP offer
-GET /webrtc/offer
+# Or use the deployment script
+../scripts/deploy/run_demo.sh
 ```
 
-### CLI Interface
-```bash
-# Run with custom camera device
-./smart_monitor --device /dev/video0
+## 📋 Features
 
-# Mock mode (no camera required)
-./smart_monitor --mock
-
-# Custom HTTP port
-./smart_monitor --port 8080
-
-# Enable debug output
-./smart_monitor --debug
-```
+- **Real-time Audio Analysis**: Noise detection, voice activity, crying detection
+- **Video Motion Detection**: Rust-based motion analysis with configurable thresholds
+- **Multi-sensor Support**: Temperature, humidity, light, and motion sensors
+- **Web Dashboard**: Real-time monitoring interface with live charts
+- **RESTful API**: HTTP endpoints for integration with external systems
+- **WebSocket Support**: Real-time bidirectional communication
+- **Physics Simulation**: Realistic baby state machine with environmental correlation
+- **Modular Architecture**: Clean separation of concerns with well-defined interfaces
 
 ## 🔧 Configuration
 
-### Runtime Options
-```c
-// Motion detection sensitivity
-#define MOTION_THRESHOLD 20        // Pixel difference threshold
-#define ADAPTIVE_THRESHOLD 0.01    // 1% minimum motion ratio
+### System Configuration
 
-// Video settings
-#define FRAME_WIDTH 640
-#define FRAME_HEIGHT 480
-#define FPS 30
+Configuration files are located in `config/`:
 
-// HTTP server
-#define DEFAULT_PORT 8080
-#define MAX_CONNECTIONS 10
-```
+- `config/systemd/smart-monitor.service` - Systemd service file
+- `config/docker/` - Docker configurations
+- `config/cmake/` - CMake modules
 
-### Environment Variables
-```bash
-export SMART_MONITOR_PORT=8080
-export SMART_MONITOR_DEVICE=/dev/video0
-export SMART_MONITOR_MOCK=true
-export SMART_MONITOR_DEBUG=false
-```
+### Runtime Configuration
 
-## 🏃‍♂️ Motion Detection
+The system can be configured via:
+- Command line arguments
+- Configuration files
+- Environment variables
 
-### Adaptive Algorithm
-- **Noise Compensation**: Automatically adjusts to camera noise
-- **Multi-criteria Detection**: 
-  - Pixel ratio threshold (>1%)
-  - Significant motion (>100 pixels, >0.1 level)
-  - High-density motion (>0.1% ratio, >500 total diff)
-- **Real-time Processing**: 30 FPS on embedded hardware
+## 📊 Architecture
 
-### Performance Metrics
-```
-Motion Events:    0-1000 per minute
-Detection Latency: <10ms
-CPU Usage:        <5% (embedded)
-Memory Usage:     <50MB
-```
+The system consists of several interconnected components:
 
-## 🎯 Production Deployment
-
-### Systemd Service
-```ini
-# /etc/systemd/system/smartmonitor.service
-[Unit]
-Description=SmartMonitor Service
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/smart_monitor
-Restart=always
-RestartSec=5
-User=root
-Environment=SMART_MONITOR_PORT=8080
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-# Enable and start
-sudo systemctl enable smartmonitor
-sudo systemctl start smartmonitor
-sudo systemctl status smartmonitor
-```
-
-### Cross-Compilation (ARM)
-```bash
-# ARM64 target
-export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU=1
-export CC=aarch64-linux-gnu-gcc
-
-cmake -B build-arm64 \
-    -DCMAKE_TOOLCHAIN_FILE=cmake/arm64-toolchain.cmake \
-    -DCMAKE_BUILD_TYPE=Release
-
-cmake --build build-arm64
-```
-
-## 🔒 Security Features
-
-### Access Control
-- CORS headers for web interface
-- Input validation on all endpoints
-- Memory-safe Rust motion detection
-- Signal handling for crash recovery
-
-### Network Security
-```bash
-# TLS/HTTPS ready (configure in production)
-export SMART_MONITOR_CERT=/path/to/cert.pem
-export SMART_MONITOR_KEY=/path/to/key.pem
-```
-
-## 📊 Monitoring & Debugging
-
-### Log Levels
-```bash
-# Debug mode
-./smart_monitor --debug
-
-# Log to file
-./smart_monitor --log-file /var/log/smartmonitor.log
-
-# Syslog integration
-./smart_monitor --syslog
-```
-
-### Metrics Collection
-```bash
-# Prometheus metrics endpoint
-GET /metrics
-
-# Custom metrics format
-{
-  "motion_events": 42,
-  "frames_processed": 15000,
-  "motion_level": 0.22,
-  "uptime": 3600,
-  "camera_active": true
-}
-```
+1. **Data Agent**: Central coordination and state management
+2. **Audio Processor**: Real-time audio analysis and detection
+3. **Video Processor**: Motion detection and video analysis
+4. **Sensor Manager**: Environmental sensor integration
+5. **Web Server**: HTTP API and WebSocket communication
+6. **Dashboard**: Web-based monitoring interface
 
 ## 🧪 Testing
 
-### Mock Mode Testing
 ```bash
-# Test without camera
-./smart_monitor --mock
+# Run unit tests
+cd build && make test
 
-# Simulated motion patterns:
-# - Moving white square (80x80 pixels)
-# - Color bar patterns
-# - Noise simulation
+# Run integration tests
+./scripts/test/run_tests.sh
+
+# Test motion detection
+./scripts/test/test_motion_detection.sh
 ```
 
-### Integration Tests
+## 📚 Documentation
+
+- **API Documentation**: `docs/api/`
+- **Architecture Guide**: `docs/architecture/`
+- **User Manual**: `docs/user_guide/`
+- **Doxygen API**: Generate with `make docs` in build directory
+
+## 🐳 Docker Support
+
 ```bash
-# Run full test suite
-cd tests
-./run_integration_tests.sh
+# Build Docker image
+docker build -t smart-monitor .
 
-# Performance benchmarks
-./benchmark_motion_detection
+# Run with Docker
+docker run -p 8083:8083 -p 8082:8082 smart-monitor
 ```
-
-## 📦 Packaging
-
-### Debian Package
-```bash
-# Build .deb package
-dpkg-deb --build smartmonitor-debian
-sudo dpkg -i smartmonitor.deb
-```
-
-### Docker Container
-```bash
-# Build image
-docker build -t smartmonitor .
-
-# Run with camera access
-docker run -p 8080:8080 --device /dev/video0 smartmonitor
-
-# Mock mode (no camera)
-docker run -p 8080:8080 smartmonitor --mock
-```
-
-## 🛠️ Development
-
-### Project Structure
-```
-smart-monitor/
-├── firmware/
-│   ├── c_core/           # Main C application
-│   │   ├── main.c
-│   │   ├── net/         # HTTP/WebRTC server
-│   │   ├── video/       # V4L2 capture
-│   │   └── ffi/         # Rust FFI bridge
-│   └── rust_modules/     # Rust motion detection
-│       └── motion/
-├── cmake/               # Build configuration
-├── tests/               # Integration tests
-├── docker/              # Container configs
-└── scripts/             # Build utilities
-```
-
-### Adding Features
-- **New Sensors**: Extend `metrics_data_t` structure
-- **Custom Algorithms**: Add to Rust `motion` module
-- **WebRTC Streaming**: Implement in `webrtc_server.c`
-- **Audio Processing**: Add to main processing loop
-
-## 📈 Performance
-
-### Benchmarks
-```
-Platform:         ARM Cortex-A53 (Raspberry Pi 4)
-Resolution:       640x480 @ 30fps
-Motion Detection: 2-3ms per frame
-Memory Usage:     45MB
-CPU Usage:        3.2%
-Network Latency:  <50ms (local)
-```
-
-### Optimization Features
-- Zero-copy video buffers
-- SIMD-optimized motion detection
-- Adaptive frame skipping
-- Memory-mapped I/O for camera
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create feature branch: `git checkout -b feature-name`
-3. Add tests for new functionality
-4. Ensure all tests pass: `cmake --build build && ctest`
-5. Submit pull request
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🔗 Roadmap
+## 🔗 Dependencies
 
-- [ ] WebRTC streaming implementation  
-- [ ] Audio processing and noise detection  
-- [ ] Yocto/OpenEmbedded layer  
-- [ ] ESP32 BLE integration  
-- [ ] Machine learning motion classification  
-- [ ] Multi-camera support  
-- [ ] Cloud storage integration  
+- **GStreamer**: Multimedia framework
+- **OpenCV**: Computer vision library
+- **Rust**: Systems programming language
+- **CMake**: Build system generator
+- **pkg-config**: Package configuration helper
 
----
+## 📞 Support
 
-**Smart Monitor** - Production-ready embedded video analytics with Rust-powered motion detection 🚀
+For support and questions:
+- Create an issue in the repository
+- Check the documentation in `docs/`
+- Review the user guide in `docs/user_guide/`

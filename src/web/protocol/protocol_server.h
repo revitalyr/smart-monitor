@@ -1,8 +1,8 @@
 #ifndef PROTOCOL_SERVER_H
 #define PROTOCOL_SERVER_H
 
-#include "../firmware/c_core/common/smart_monitor_protocol.h"
-#include "../firmware/c_core/agent/data_agent.h"
+#include "../../core/common/smart_monitor_protocol.h"
+#include "../../core/agent/data_agent.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/socket.h>
