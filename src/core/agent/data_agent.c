@@ -44,6 +44,28 @@ struct data_agent {
     ByteCount prev_frame_size;
 };
 
+// Helper functions for internal access
+static void agent_set_prev_frame(DataAgent* agent, uint8_t* frame, ByteCount size) {
+    if (!agent) return;
+    
+    free(agent->prev_frame);
+    agent->prev_frame = frame;
+    agent->prev_frame_size = size;
+}
+
+static void agent_update_stats(DataAgent* agent, FrameCount frames) {
+    if (!agent) return;
+    agent->stats.frames_processed = frames;
+}
+
+static bool agent_get_camera_enabled(const DataAgent* agent) {
+    return agent ? agent->config.enable_camera : false;
+}
+
+static IntervalMs agent_get_update_interval(const DataAgent* agent) {
+    return agent ? agent->config.update_interval_ms : 1000;
+}
+
 // Helper function to get current timestamp
 static uint32_t get_timestamp_ms() {
     struct timespec ts;
@@ -566,23 +588,23 @@ char* data_agent_get_system_json(data_agent_t* agent) {
 
 // Worker thread function
 static void* agent_worker_thread(void* arg) {
-    data_agent_t* agent = (data_agent_t*)arg;
+    DataAgent* agent = (DataAgent*)arg;
     
     while (agent->running) {
         uint32_t timestamp = get_timestamp_ms();
         
         // Update sensor data
         if (agent->config.enable_sensors) {
-            sensor_data_t sensor_data;
+            SensorData sensor_data = {0};
             
             if (agent->config.enable_simulation) {
-                generate_realistic_sensor_data(&sensor_data);
+                generate_realistic_sensor_data((sensor_data_t*)&sensor_data);
             } else {
                 // Read from real sensors - not implemented yet
-                sensor_data.temperature = 22.0f + (rand() % 100) * 0.1f;
-                sensor_data.humidity = 45.0f + (rand() % 200) * 0.1f;
-                sensor_data.light_level = 300 + (rand() % 400);
-                sensor_data.motion_detected = (rand() % 100) < 5;
+                sensor_data.temperature_c = 22.0f + (rand() % 100) * 0.1f;
+                sensor_data.humidity_percent = 45.0f + (rand() % 200) * 0.1f;
+                sensor_data.light_level_lux = 300 + (rand() % 400);
+                sensor_data.pir_motion_detected = (rand() % 100) < 5;
             }
             
             if (agent->sensor_callback) {
@@ -635,48 +657,45 @@ static void* agent_worker_thread(void* arg) {
                     );
                     
                     if (result.motion_detected) {
-                        motion_alert_t alert;
+                        MotionAlert alert = {0};
                         alert.motion_level = result.motion_level;
                         alert.x_coord = 320; // Default center
                         alert.y_coord = 240; // Default center
                         alert.frame_number = agent->stats.frames_processed;
-                        alert.confidence = (uint8_t)(result.motion_level * 100);
-                        alert.reserved = 0;
+                        alert.confidence = (ConfidenceLevel)(result.motion_level * 100);
                         
                         if (agent->motion_callback) {
                             agent->motion_callback(&alert, agent->motion_user_data);
                         }
+                        agent_update_stats(agent, agent->stats.frames_processed + 1);
                         agent->stats.motion_events++;
                     }
                 }
                 
                 // Store previous frame
-                free(agent->prev_frame);
-                agent->prev_frame = malloc(frame_size);
+                agent_set_prev_frame(agent, malloc(frame_size), frame_size);
                 if (agent->prev_frame) {
                     memcpy(agent->prev_frame, frame_data, frame_size);
-                    agent->prev_frame_size = frame_size;
                 }
             }
         }
         
         // Send system status
         if (agent->status_callback) {
-            system_status_t status;
-            status.cpu_usage = 20 + (rand() % 30);
-            status.memory_usage = 30 + (rand() % 40);
+            SystemStatus status = {0};
+            status.cpu_usage_percent = 20 + (rand() % 30);
+            status.memory_usage_percent = 30 + (rand() % 40);
             status.fps = 25 + (rand() % 10);
             status.frames_processed = agent->stats.frames_processed;
-            status.uptime = get_timestamp_ms() - agent->stats.start_time;
-            status.camera_active = agent->config.enable_camera;
+            status.uptime_ms = get_timestamp_ms() - agent->stats.start_time;
+            status.camera_active = agent_get_camera_enabled(agent);
             status.recording_active = false; // TODO: implement recording
-            status.reserved = 0;
             
             agent->status_callback(&status, agent->status_user_data);
         }
         
         // Sleep for update interval
-        usleep(agent->config.update_interval_ms * 1000);
+        usleep(agent_get_update_interval(agent) * 1000);
     }
     
     return NULL;

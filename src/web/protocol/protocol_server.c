@@ -1,4 +1,5 @@
 #include "protocol_server.h"
+#include "../../core/common/smart_monitor_protocol.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
