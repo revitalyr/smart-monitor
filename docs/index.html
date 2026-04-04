@@ -243,13 +243,44 @@
                     
                     <div class="feature-section">
                         <h3>Technology Stack</h3>
-                        <div class="code-block">
-C/C++ (Core), Rust (Motion Detection), 
-JavaScript (Frontend), WebSocket (Real-time), 
-HTTP/REST API, JSON Protocol, 
-Linux/Embedded, GStreamer (Audio), 
-OpenCV (Video), Physics Simulation
-                        </div>
+                        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                            <tr style="background: #f8f9fa;">
+                                <th style="padding: 10px; border: 1px solid #dee2e6; text-align: left;">Component</th>
+                                <th style="padding: 10px; border: 1px solid #dee2e6; text-align: left;">Technology</th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Core System</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">C/C++</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Motion Detection</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Rust</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Frontend</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">JavaScript</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Real-time Communication</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">WebSocket</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">API Protocol</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">HTTP/REST API, JSON</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Audio Processing</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">GStreamer</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Video Processing</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">OpenCV</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Simulation</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Physics-based</td>
+                            </tr>
+                        </table>
                     </div>
                     
                     <div class="diagram-container" id="overview-diagram-container">
@@ -365,13 +396,38 @@ sequenceDiagram
                     
                     <div class="feature-section">
                         <h3>HTTP Endpoints</h3>
-                        <div class="code-block">
-GET  /sensors/i2c     - Sensor data (temp, humidity, light, motion)
-GET  /audio/status     - Audio analysis (noise, voice, crying, screaming)
-GET  /video/status     - Video analysis (motion probability, detection)
-GET  /system/status    - System metrics (CPU, memory, uptime)
-POST /api/command      - Send commands to system
-                        </div>
+                        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                            <tr style="background: #f8f9fa;">
+                                <th style="padding: 10px; border: 1px solid #dee2e6; text-align: left;">Method</th>
+                                <th style="padding: 10px; border: 1px solid #dee2e6; text-align: left;">Endpoint</th>
+                                <th style="padding: 10px; border: 1px solid #dee2e6; text-align: left;">Description</th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">GET</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">/sensors/i2c</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Sensor data (temp, humidity, light, motion)</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">GET</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">/audio/status</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Audio analysis (noise, voice, crying, screaming)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">GET</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">/video/status</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Video analysis (motion probability, detection)</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">GET</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">/system/status</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">System metrics (CPU, memory, uptime)</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">POST</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">/api/command</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Send commands to system</td>
+                            </tr>
+                        </table>
                     </div>
                     
                     <div class="feature-section">
@@ -398,10 +454,10 @@ flowchart TD
     B -->|GET| C[Endpoint Selection]
     B -->|POST| D[Command Processing]
     
-    C --> E[/sensors/i2c]
-    C --> F[/audio/status]
-    C --> G[/video/status]
-    C --> H[/system/status]
+    C --> E["/sensors/i2c"]
+    C --> F["/audio/status"]
+    C --> G["/video/status"]
+    C --> H["/system/status"]
     
     E --> I[Sensor Data JSON]
     F --> J[Audio Analysis JSON]
@@ -447,11 +503,53 @@ flowchart TD
                     
                     <div class="feature-section">
                         <h3>State Transitions</h3>
-                        <div class="code-block">
-SLEEPING_PEACEFUL → RESTLESS → STIRRING → FUSSY 
-→ CRYING_SOFT → CRYING_LOUD → SCREAMING 
-→ FALLING_ASLEEP → SLEEPING_PEACEFUL
-                        </div>
+                        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                            <tr style="background: #f8f9fa;">
+                                <th style="padding: 10px; border: 1px solid #dee2e6; text-align: left;">State</th>
+                                <th style="padding: 10px; border: 1px solid #dee2e6; text-align: left;">Description</th>
+                                <th style="padding: 10px; border: 1px solid #dee2e6; text-align: left;">Next States</th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">SLEEPING_PEACEFUL</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Baby is sleeping peacefully</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">→ RESTLESS</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">RESTLESS</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Baby is restless but not crying</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">→ STIRRING → SLEEPING_PEACEFUL</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">STIRRING</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Baby is starting to wake up</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">→ FUSSY → RESTLESS</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">FUSSY</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Baby is fussy and uncomfortable</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">→ CRYING_SOFT → STIRRING</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">CRYING_SOFT</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Baby is crying softly</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">→ CRYING_LOUD → FUSSY</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">CRYING_LOUD</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Baby is crying loudly</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">→ SCREAMING → CRYING_SOFT</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">SCREAMING</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Baby is screaming (emergency)</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">→ FALLING_ASLEEP → CRYING_LOUD</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6; font-family: monospace;">FALLING_ASLEEP</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Baby is calming down and falling asleep</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">→ SLEEPING_PEACEFUL → SCREAMING</td>
+                            </tr>
+                        </table>
                     </div>
                     
                     <div class="diagram-container" id="dataflow-diagram-container">
@@ -517,14 +615,36 @@ flowchart TD
                     
                     <div class="feature-section">
                         <h3>Runtime Requirements</h3>
-                        <div class="code-block">
-Linux kernel 4.15+, 
-2GB RAM minimum, 
-10GB storage space,
-Network connectivity,
-Camera device (/dev/video0),
-Audio input device
-                        </div>
+                        <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                            <tr style="background: #f8f9fa;">
+                                <th style="padding: 10px; border: 1px solid #dee2e6; text-align: left;">Component</th>
+                                <th style="padding: 10px; border: 1px solid #dee2e6; text-align: left;">Requirement</th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Operating System</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Linux kernel 4.15+</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Memory</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">2GB RAM minimum</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Storage</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">10GB storage space</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Network</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Network connectivity</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Camera</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Camera device (/dev/video0)</td>
+                            </tr>
+                            <tr style="background: #f8f9fa;">
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Audio</td>
+                                <td style="padding: 8px; border: 1px solid #dee2e6;">Audio input device</td>
+                            </tr>
+                        </table>
                     </div>
                     
                     <div class="diagram-container" id="deployment-diagram-container">
