@@ -49,7 +49,7 @@ endif()
 
 # Add executable with conditional sources
 set(SOURCES
-    main_new.c
+    main.c
     video/v4l2_capture.c
     ffi/rust_bridge.c
     ${CMAKE_SOURCE_DIR}/web/http_server.c

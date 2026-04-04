@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Monitor - Technical Documentation</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #fff, #f0f0f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            border-bottom: 1px solid #e0e0e0;
+            overflow-x: auto;
+        }
+        
+        .nav-tab {
+            padding: 15px 25px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .nav-tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .nav-tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .tab-content {
+            padding: 30px;
+            min-height: 500px;
+        }
+        
+        .tab-pane {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .tab-pane.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .diagram-container {
+            position: relative;
+            overflow: auto;
+            max-height: 600px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin: 20px 0;
+            background: #fafafa;
+        }
+        
+        .scale-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            align-items: center;
+            background: white;
+            padding: 5px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .scale-btn {
+            width: 30px;
+            height: 30px;
+            border: none;
+            background: #667eea;
+            color: white;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+        
+        .scale-btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .scale-display {
+            font-size: 12px;
+            min-width: 40px;
+            text-align: center;
+        }
+        
+        .feature-section {
+            margin: 20px 0;
+        }
+        
+        .feature-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        
+        .feature-list {
+            list-style: none;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .feature-list li:before {
+            content: '✅ ';
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .nav-tabs {
+                flex-direction: column;
+            }
+            
+            .nav-tab {
+                border-bottom: 1px solid #e0e0e0;
+            }
+            
+            .scale-controls {
+                position: static;
+                margin: 10px 0;
+                justify-content: center;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Smart Monitor</h1>
+            <p>IoT Baby Monitoring System with Real-time Audio/Video Analysis</p>
+        </div>
+        
+        <div class="card">
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="overview">📊 Overview</button>
+                <button class="nav-tab" data-tab="architecture">🏗️ Architecture</button>
+                <button class="nav-tab" data-tab="api">🔄 API</button>
+                <button class="nav-tab" data-tab="dataflow">📈 Data Flow</button>
+                <button class="nav-tab" data-tab="deployment">🚀 Deployment</button>
+            </div>
+            
+            <div class="tab-content">
+                <!-- Overview Tab -->
+                <div class="tab-pane active" id="overview">
+                    <h2>System Overview</h2>
+                    <p>Smart Monitor is an advanced IoT baby monitoring system that provides real-time audio and video analysis with physics-based simulation. The system correlates sensor data to detect baby states and provide intelligent alerts.</p>
+                    
+                    <div class="feature-section">
+                        <h3>Key Features</h3>
+                        <ul class="feature-list">
+                            <li>Real-time audio analysis with crying detection</li>
+                            <li>Video motion detection with probability scoring</li>
+                            <li>Physics-based baby state simulation</li>
+                            <li>Correlated sensor data (temperature, humidity, light)</li>
+                            <li>Web-based dashboard with live updates</li>
+                            <li>RESTful API for integration</li>
+                            <li>Nightlight automation</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="feature-section">
+                        <h3>Technology Stack</h3>
+                        <div class="code-block">
+C/C++ (Core), Rust (Motion Detection), 
+JavaScript (Frontend), WebSocket (Real-time), 
+HTTP/REST API, JSON Protocol, 
+Linux/Embedded, GStreamer (Audio), 
+OpenCV (Video), Physics Simulation
+                        </div>
+                    </div>
+                    
+                    <div class="diagram-container">
+                        <div class="scale-controls">
+                            <button class="scale-btn" data-scale-delta="-10">−</button>
+                            <span class="scale-display">100%</span>
+                            <button class="scale-btn" data-scale-delta="10">+</button>
+                            <button class="scale-btn" data-reset-scale>⟲</button>
+                        </div>
+                        <div id="overview-diagram"></div>
+                    </div>
+                </div>
+                
+                <!-- Architecture Tab -->
+                <div class="tab-pane" id="architecture">
+                    <h2>System Architecture</h2>
+                    <p>The Smart Monitor consists of several interconnected components that work together to provide comprehensive baby monitoring capabilities.</p>
+                    
+                    <div class="feature-section">
+                        <h3>Core Components</h3>
+                        <ul class="feature-list">
+                            <li>Data Agent - Central simulation and data processing engine</li>
+                            <li>HTTP Server - RESTful API and web interface</li>
+                            <li>Protocol Server - Real-time WebSocket communication</li>
+                            <li>Motion Detector - Rust-based video analysis</li>
+                            <li>Audio Processor - Noise detection and crying analysis</li>
+                            <li>Sensor Manager - Temperature, humidity, light sensors</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="diagram-container">
+                        <div class="scale-controls">
+                            <button class="scale-btn" data-scale-delta="-10">−</button>
+                            <span class="scale-display">100%</span>
+                            <button class="scale-btn" data-scale-delta="10">+</button>
+                            <button class="scale-btn" data-reset-scale>⟲</button>
+                        </div>
+                        <div id="architecture-diagram"></div>
+                    </div>
+                </div>
+                
+                <!-- API Tab -->
+                <div class="tab-pane" id="api">
+                    <h2>API Documentation</h2>
+                    <p>The Smart Monitor provides RESTful HTTP endpoints and real-time WebSocket connections for accessing system data and controlling functionality.</p>
+                    
+                    <div class="feature-section">
+                        <h3>HTTP Endpoints</h3>
+                        <div class="code-block">
+GET  /sensors/i2c     - Sensor data (temp, humidity, light, motion)
+GET  /audio/status     - Audio analysis (noise, voice, crying, screaming)
+GET  /video/status     - Video analysis (motion probability, detection)
+GET  /system/status    - System metrics (CPU, memory, uptime)
+POST /api/command      - Send commands to system
+                        </div>
+                    </div>
+                    
+                    <div class="feature-section">
+                        <h3>Data Flow</h3>
+                        <ul class="feature-list">
+                            <li>Client requests data via HTTP endpoints every 100ms</li>
+                            <li>Server returns JSON with current sensor readings</li>
+                            <li>WebSocket provides real-time updates for critical events</li>
+                            <li>All data is correlated through baby state machine</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="diagram-container">
+                        <div class="scale-controls">
+                            <button class="scale-btn" data-scale-delta="-10">−</button>
+                            <span class="scale-display">100%</span>
+                            <button class="scale-btn" data-scale-delta="10">+</button>
+                            <button class="scale-btn" data-reset-scale>⟲</button>
+                        </div>
+                        <div id="api-diagram"></div>
+                    </div>
+                </div>
+                
+                <!-- Data Flow Tab -->
+                <div class="tab-pane" id="dataflow">
+                    <h2>Data Flow & Processing</h2>
+                    <p>Understanding how data flows through the system is crucial for integration and debugging.</p>
+                    
+                    <div class="feature-section">
+                        <h3>Processing Pipeline</h3>
+                        <ul class="feature-list">
+                            <li>Sensor data collection at 10Hz frequency</li>
+                            <li>Baby state machine with realistic transitions</li>
+                            <li>Physics-based correlation between sensors</li>
+                            <li>RC low-pass filtering for smooth data</li>
+                            <li>Probabilistic detection thresholds</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="feature-section">
+                        <h3>State Transitions</h3>
+                        <div class="code-block">
+SLEEPING_PEACEFUL → RESTLESS → STIRRING → FUSSY 
+→ CRYING_SOFT → CRYING_LOUD → SCREAMING 
+→ FALLING_ASLEEP → SLEEPING_PEACEFUL
+                        </div>
+                    </div>
+                    
+                    <div class="diagram-container">
+                        <div class="scale-controls">
+                            <button class="scale-btn" data-scale-delta="-10">−</button>
+                            <span class="scale-display">100%</span>
+                            <button class="scale-btn" data-scale-delta="10">+</button>
+                            <button class="scale-btn" data-reset-scale>⟲</button>
+                        </div>
+                        <div id="dataflow-diagram"></div>
+                    </div>
+                </div>
+                
+                <!-- Deployment Tab -->
+                <div class="tab-pane" id="deployment">
+                    <h2>Deployment & Operations</h2>
+                    <p>Smart Monitor is designed for embedded Linux systems with comprehensive deployment and monitoring capabilities.</p>
+                    
+                    <div class="feature-section">
+                        <h3>Build System</h3>
+                        <ul class="feature-list">
+                            <li>CMake build system with cross-compilation support</li>
+                            <li>Ninja build tool for fast compilation</li>
+                            <li>Rust integration for motion detection</li>
+                            <li>Dependency management through pkg-config</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="feature-section">
+                        <h3>Runtime Requirements</h3>
+                        <div class="code-block">
+Linux kernel 4.15+, 
+2GB RAM minimum, 
+10GB storage space,
+Network connectivity,
+Camera device (/dev/video0),
+Audio input device
+                        </div>
+                    </div>
+                    
+                    <div class="diagram-container">
+                        <div class="scale-controls">
+                            <button class="scale-btn" data-scale-delta="-10">−</button>
+                            <span class="scale-display">100%</span>
+                            <button class="scale-btn" data-scale-delta="10">+</button>
+                            <button class="scale-btn" data-reset-scale>⟲</button>
+                        </div>
+                        <div id="deployment-diagram"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="mermaid-height-util.js"></script>
+    <script>
+        // Initialize Mermaid configuration
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#667eea',
+                primaryTextColor: '#333',
+                lineColor: '#667eea',
+                secondaryColor: '#764ba2',
+                fontSize: '14px'
+            },
+            flowchart: { useMaxWidth: false, htmlLabels: true }
+        });
+        
+        // Define Mermaid diagrams
+        const diagrams = {
+            overview: `graph TD
+    A[Smart Monitor System] --> B[Data Agent]
+    A --> C[HTTP Server]
+    A --> D[Protocol Server]
+    
+    B --> E[Sensor Manager]
+    B --> F[Audio Processor]
+    B --> G[Motion Detector]
+    B --> H[Baby State Machine]
+    
+    E --> I[Temperature Sensor]
+    E --> J[Humidity Sensor]
+    E --> K[Light Sensor]
+    
+    F --> L[Noise Detection]
+    F --> M[Crying Detection]
+    F --> N[Scream Detection]
+    
+    G --> O[Video Analysis]
+    G --> P[Motion Scoring]
+    
+    H --> Q[State Transitions]
+    H --> R[Correlation Engine]
+    
+    C --> S[REST API]
+    C --> T[Web Dashboard]
+    
+    D --> U[WebSocket]
+    D --> V[Real-time Updates]
+    
+    style A fill:#667eea
+    style B fill:#667eea
+    style C fill:#667eea
+    style D fill:#667eea
+    style H fill:#28a745
+    style Q fill:#ffc107
+    style R fill:#28a745`,
+            
+            architecture: `sequenceDiagram
+    participant Client as Web Client
+    participant HTTP as HTTP Server
+    participant Agent as Data Agent
+    participant Sensors as Sensor Manager
+    participant Audio as Audio Processor
+    participant Video as Motion Detector
+    
+    Client->>HTTP: GET /sensors/i2c
+    HTTP->>Agent: Request sensor data
+    Agent->>Sensors: Read sensors
+    Sensors-->>Agent: Temperature, Humidity, Light, Motion
+    Agent-->>HTTP: JSON sensor data
+    HTTP-->>Client: Response with sensor values
+    
+    Client->>HTTP: GET /audio/status
+    HTTP->>Agent: Request audio data
+    Agent->>Audio: Process audio stream
+    Audio-->>Agent: Noise level, Voice activity, Crying
+    Agent-->>HTTP: JSON audio data
+    HTTP-->>Client: Response with audio analysis
+    
+    Client->>HTTP: GET /video/status
+    HTTP->>Agent: Request video data
+    Agent->>Video: Analyze video frames
+    Video-->>Agent: Motion probability, Detection
+    Agent-->>HTTP: JSON video data
+    HTTP-->>Client: Response with video analysis`,
+            
+            api: `flowchart TD
+    A[Client Request] --> B{HTTP Method}
+    
+    B -->|GET| C[Endpoint Selection]
+    B -->|POST| D[Command Processing]
+    
+    C --> E[/sensors/i2c]
+    C --> F[/audio/status]
+    C --> G[/video/status]
+    C --> H[/system/status]
+    
+    E --> I[Sensor Data JSON]
+    F --> J[Audio Analysis JSON]
+    G --> K[Video Analysis JSON]
+    H --> L[System Metrics JSON]
+    
+    D --> M[Parse Command]
+    M --> N[Execute Action]
+    N --> O[Response Status]
+    
+    I --> P[Return Response]
+    J --> P
+    K --> P
+    L --> P
+    O --> P
+    
+    style A fill:#667eea
+    style P fill:#28a745
+    style N fill:#ffc107
+    style I fill:#6c757d
+    style J fill:#6c757d
+    style K fill:#6c757d
+    style L fill:#6c757d`,
+            
+            dataflow: `flowchart TD
+    A[Raw Sensor Input] --> B[Data Validation]
+    B --> C[Low-pass Filter]
+    C --> D[Baby State Machine]
+    
+    D --> E{Current State}
+    
+    E -->|SLEEPING_PEACEFUL| F[Low Activity Mode]
+    E -->|RESTLESS| G[Medium Activity Mode]
+    E -->|CRYING_SOFT| H[High Activity Mode]
+    E -->|SCREAMING| I[Emergency Mode]
+    
+    F --> J[Normal Processing]
+    G --> K[Enhanced Monitoring]
+    H --> L[Alert Preparation]
+    I --> M[Immediate Alerts]
+    
+    J --> N[Data Correlation]
+    K --> N
+    L --> N
+    M --> N
+    
+    N --> O[JSON Output]
+    O --> P[HTTP Response]
+    O --> Q[WebSocket Update]
+    
+    R[Environmental Triggers] --> D
+    R --> S[Temperature Changes]
+    R --> T[Noise Thresholds]
+    
+    style A fill:#667eea
+    style O fill:#28a745
+    style M fill:#dc3545
+    style L fill:#ffc107
+    style N fill:#6c757d`,
+            
+            deployment: `flowchart TD
+    A[Source Code] --> B[CMake Configuration]
+    B --> C[Ninja Build]
+    
+    C --> D[Compilation]
+    D --> E[Linking]
+    E --> F[smart_monitor binary]
+    
+    F --> G[System Deployment]
+    G --> H[Service Installation]
+    H --> I[Configuration Setup]
+    
+    I --> J[Runtime Environment]
+    J --> K[Monitor Services]
+    
+    K --> L{Health Check}
+    L -->|Healthy| M[Running State]
+    L -->|Error| N[Recovery Mode]
+    
+    N --> O[Log Analysis]
+    O --> P[Automatic Restart]
+    P --> J
+    
+    M --> Q[Metrics Collection]
+    Q --> R[Performance Monitoring]
+    R --> S[Alert System]
+    
+    style A fill:#667eea
+    style F fill:#28a745
+    style M fill:#28a745
+    style N fill:#dc3545
+    style L fill:#ffc107
+    style Q fill:#6c757d`
+        };
+        
+        // Initialize the height adjuster
+        document.addEventListener('DOMContentLoaded', function() {
+            const adjuster = new MermaidHeightAdjuster();
+            adjuster.init();
+        });
+    </script>
+</body>
+</html>
