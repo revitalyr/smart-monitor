@@ -100,9 +100,9 @@ DataAgent* data_agent_create(const AgentConfig* config);
 /**
  * @brief Destroy data agent and free resources
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  */
-void data_agent_destroy(data_agent_t* agent);
+void data_agent_destroy(DataAgent* agent);
 
 /**
  * @brief Start data agent processing
@@ -110,96 +110,96 @@ void data_agent_destroy(data_agent_t* agent);
  * @param agent Pointer to data_agent_t instance
  * @return true on success, false on failure
  */
-bool data_agent_start(data_agent_t* agent);
+bool data_agent_start(DataAgent* agent);
 
 /**
  * @brief Stop data agent processing
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  */
-void data_agent_stop(data_agent_t* agent);
+void data_agent_stop(DataAgent* agent);
 
 /**
  * @brief Check if data agent is running
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @return true if running, false otherwise
  */
-bool data_agent_is_running(const data_agent_t* agent);
+bool data_agent_is_running(const DataAgent* agent);
 
 /**
  * @brief Set sensor data callback
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @param callback Sensor data callback function
  * @param user_data User data to pass to callback
  */
-void data_agent_set_sensor_callback(data_agent_t* agent, sensor_data_callback_t callback, void* user_data);
+void data_agent_set_sensor_callback(DataAgent* agent, SensorDataCallback callback, void* user_data);
 
 /**
  * @brief Set audio data callback
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @param callback Audio data callback function
  * @param user_data User data to pass to callback
  */
-void data_agent_set_audio_callback(data_agent_t* agent, audio_data_callback_t callback, void* user_data);
+void data_agent_set_audio_callback(DataAgent* agent, AudioDataCallback callback, void* user_data);
 
 /**
  * @brief Set motion alert callback
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @param callback Motion alert callback function
  * @param user_data User data to pass to callback
  */
-void data_agent_set_motion_callback(data_agent_t* agent, motion_alert_callback_t callback, void* user_data);
+void data_agent_set_motion_callback(DataAgent* agent, MotionAlertCallback callback, void* user_data);
 
 /**
  * @brief Set system status callback
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @param callback System status callback function
  * @param user_data User data to pass to callback
  */
-void data_agent_set_status_callback(data_agent_t* agent, system_status_callback_t callback, void* user_data);
+void data_agent_set_status_callback(DataAgent* agent, SystemStatusCallback callback, void* user_data);
 
 /**
  * @brief Get agent statistics
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @return Agent statistics structure
  */
-agent_stats_t data_agent_get_stats(const data_agent_t* agent);
+AgentStats data_agent_get_stats(const DataAgent* agent);
 /**
  * @brief Reset agent statistics
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  */
-void data_agent_reset_stats(data_agent_t* agent);
+void data_agent_reset_stats(DataAgent* agent);
 
 /**
  * @brief Set motion detection threshold
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @param threshold Motion detection threshold (0.0-1.0)
  */
-void data_agent_set_motion_threshold(data_agent_t* agent, float threshold);
+void data_agent_set_motion_threshold(DataAgent* agent, float threshold);
 
 /**
  * @brief Set audio detection threshold
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @param threshold Audio detection threshold (0.0-1.0)
  */
-void data_agent_set_audio_threshold(data_agent_t* agent, float threshold);
+void data_agent_set_audio_threshold(DataAgent* agent, float threshold);
 
 /**
  * @brief Set update interval
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @param interval_ms Update interval in milliseconds
  */
-void data_agent_set_update_interval(data_agent_t* agent, uint32_t interval_ms);
+void data_agent_set_update_interval(DataAgent* agent, uint32_t interval_ms);
 
 /**
  * @brief Set HTTP server JSON callbacks

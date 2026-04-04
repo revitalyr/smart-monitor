@@ -11,8 +11,8 @@
 #include <stdio.h>
 
 struct data_agent {
-    agent_config_t config;
-    agent_stats_t stats;
+    AgentConfig config;
+    AgentStats stats;
     pthread_t worker_thread;
     volatile bool running;
     
@@ -20,13 +20,13 @@ struct data_agent {
     v4l2_capture_t* camera;
     audio_capture_t* audio;
     noise_detector_t* noise_detector;
-    rust_motion_detector_t* motion_detector;
+    MotionDetector* motion_detector;
     
     // Callbacks
-    sensor_data_callback_t sensor_callback;
-    audio_data_callback_t audio_callback;
-    motion_alert_callback_t motion_callback;
-    system_status_callback_t status_callback;
+    SensorDataCallback sensor_callback;
+    AudioDataCallback audio_callback;
+    MotionAlertCallback motion_callback;
+    SystemStatusCallback status_callback;
     void* sensor_user_data;
     void* audio_user_data;
     void* motion_user_data;
@@ -41,7 +41,7 @@ struct data_agent {
     // Internal state
     uint32_t sequence;
     uint8_t* prev_frame;
-    size_t prev_frame_size;
+    ByteCount prev_frame_size;
 };
 
 // Helper function to get current timestamp
@@ -683,11 +683,11 @@ static void* agent_worker_thread(void* arg) {
 }
 
 // Public API implementation
-data_agent_t* data_agent_create(const agent_config_t* config) {
-    data_agent_t* agent = calloc(1, sizeof(data_agent_t));
+DataAgent* data_agent_create(const AgentConfig* config) {
+    DataAgent* agent = calloc(1, sizeof(DataAgent));
     if (!agent) return NULL;
     
-    memcpy(&agent->config, config, sizeof(agent_config_t));
+    memcpy(&agent->config, config, sizeof(AgentConfig));
     agent->stats.start_time = get_timestamp_ms();
     agent->sequence = 0;
     
@@ -695,7 +695,7 @@ data_agent_t* data_agent_create(const agent_config_t* config) {
     if (config->enable_camera && !config->enable_simulation) {
         agent->camera = v4l2_create(config->video_source);
         if (agent->camera) {
-            v4l2_initialize(agent->camera, 640, 480);
+            v4l2_initialize(agent->camera, DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT);
             v4l2_start_capture(agent->camera);
         }
         
@@ -708,11 +708,11 @@ data_agent_t* data_agent_create(const agent_config_t* config) {
     if (config->enable_audio && !config->enable_simulation) {
         agent->audio = audio_create_mock();
         if (agent->audio) {
-            audio_initialize(agent->audio, 44100, 1);
+            audio_initialize(agent->audio, DEFAULT_AUDIO_SAMPLE_RATE, 1);
             audio_start_capture(agent->audio);
         }
         
-        agent->noise_detector = noise_detector_create(44100);
+        agent->noise_detector = noise_detector_create(DEFAULT_AUDIO_SAMPLE_RATE);
         if (agent->noise_detector) {
             noise_detector_initialize(agent->noise_detector);
         }
@@ -726,7 +726,7 @@ data_agent_t* data_agent_create(const agent_config_t* config) {
     return agent;
 }
 
-void data_agent_destroy(data_agent_t* agent) {
+void data_agent_destroy(DataAgent* agent) {
     if (!agent) return;
     
     data_agent_stop(agent);
@@ -741,47 +741,47 @@ void data_agent_destroy(data_agent_t* agent) {
     free(agent);
 }
 
-bool data_agent_start(data_agent_t* agent) {
+bool data_agent_start(DataAgent* agent) {
     if (!agent || agent->running) return false;
     
     agent->running = true;
     return pthread_create(&agent->worker_thread, NULL, agent_worker_thread, agent) == 0;
 }
 
-void data_agent_stop(data_agent_t* agent) {
+void data_agent_stop(DataAgent* agent) {
     if (!agent || !agent->running) return;
     
     agent->running = false;
     pthread_join(agent->worker_thread, NULL);
 }
 
-bool data_agent_is_running(const data_agent_t* agent) {
+bool data_agent_is_running(const DataAgent* agent) {
     return agent ? agent->running : false;
 }
 
 // Callback registration
-void data_agent_set_sensor_callback(data_agent_t* agent, sensor_data_callback_t callback, void* user_data) {
+void data_agent_set_sensor_callback(DataAgent* agent, SensorDataCallback callback, void* user_data) {
     if (agent) {
         agent->sensor_callback = callback;
         agent->sensor_user_data = user_data;
     }
 }
 
-void data_agent_set_audio_callback(data_agent_t* agent, audio_data_callback_t callback, void* user_data) {
+void data_agent_set_audio_callback(DataAgent* agent, AudioDataCallback callback, void* user_data) {
     if (agent) {
         agent->audio_callback = callback;
         agent->audio_user_data = user_data;
     }
 }
 
-void data_agent_set_motion_callback(data_agent_t* agent, motion_alert_callback_t callback, void* user_data) {
+void data_agent_set_motion_callback(DataAgent* agent, MotionAlertCallback callback, void* user_data) {
     if (agent) {
         agent->motion_callback = callback;
         agent->motion_user_data = user_data;
     }
 }
 
-void data_agent_set_status_callback(data_agent_t* agent, system_status_callback_t callback, void* user_data) {
+void data_agent_set_status_callback(DataAgent* agent, SystemStatusCallback callback, void* user_data) {
     if (agent) {
         agent->status_callback = callback;
         agent->status_user_data = user_data;
@@ -789,31 +789,35 @@ void data_agent_set_status_callback(data_agent_t* agent, system_status_callback_
 }
 
 // Statistics
-agent_stats_t data_agent_get_stats(const data_agent_t* agent) {
-    return agent ? agent->stats : (agent_stats_t){0};
+AgentStats data_agent_get_stats(const DataAgent* agent) {
+    if (!agent) {
+        AgentStats empty_stats = {0};
+        return empty_stats;
+    }
+    return agent->stats;
 }
 
-void data_agent_reset_stats(data_agent_t* agent) {
+void data_agent_reset_stats(DataAgent* agent) {
     if (agent) {
-        memset(&agent->stats, 0, sizeof(agent_stats_t));
+        memset(&agent->stats, 0, sizeof(AgentStats));
         agent->stats.start_time = get_timestamp_ms();
     }
 }
 
 // Configuration
-void data_agent_set_motion_threshold(data_agent_t* agent, float threshold) {
+void data_agent_set_motion_threshold(DataAgent* agent, float threshold) {
     if (agent) {
         agent->config.motion_threshold = threshold;
     }
 }
 
-void data_agent_set_audio_threshold(data_agent_t* agent, float threshold) {
+void data_agent_set_audio_threshold(DataAgent* agent, float threshold) {
     if (agent) {
         agent->config.audio_threshold = threshold;
     }
 }
 
-void data_agent_set_update_interval(data_agent_t* agent, uint32_t interval_ms) {
+void data_agent_set_update_interval(DataAgent* agent, uint32_t interval_ms) {
     if (agent) {
         agent->config.update_interval_ms = interval_ms;
     }
