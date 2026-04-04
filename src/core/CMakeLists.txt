@@ -35,8 +35,8 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/video/v4l2_capture.c)
 endif()
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/ffi/rust_bridge.c)
-    list(APPEND CORE_SOURCES ffi/rust_bridge_mock.c)
-    message(STATUS "Found rust_bridge_mock.c")
+    list(APPEND CORE_SOURCES ffi/rust_bridge.c)
+    message(STATUS "Found rust_bridge.c")
 endif()
 
 # Create individual module libraries
