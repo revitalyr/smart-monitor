@@ -112,6 +112,30 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/core/main.c)
         list(APPEND LINK_LIBS smart_monitor_agent)
     endif()
 
+    if(TARGET smart_monitor_communication)
+        list(APPEND LINK_LIBS smart_monitor_communication)
+    endif()
+
+    if(TARGET smart_monitor_audio)
+        list(APPEND LINK_LIBS smart_monitor_audio)
+    endif()
+
+    if(TARGET smart_monitor_sensors)
+        list(APPEND LINK_LIBS smart_monitor_sensors)
+    endif()
+
+    if(TARGET smart_monitor_http_api)
+        list(APPEND LINK_LIBS smart_monitor_http_api)
+    endif()
+
+    if(TARGET smart_monitor_webrtc_server)
+        list(APPEND LINK_LIBS smart_monitor_webrtc_server)
+    endif()
+
+    if(TARGET smart_monitor_protocol_server)
+        list(APPEND LINK_LIBS smart_monitor_protocol_server)
+    endif()
+
     target_link_libraries(smart_monitor_app ${LINK_LIBS})
 
     # Include directories

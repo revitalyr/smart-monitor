@@ -24,6 +24,11 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/common/smart_monitor_protocol.c)
     message(STATUS "Found smart_monitor_protocol.c")
 endif()
 
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/common/globals.c)
+    list(APPEND CORE_SOURCES common/globals.c)
+    message(STATUS "Found globals.c")
+endif()
+
 # Create individual module libraries
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/agent/data_agent.c)
     add_library(smart_monitor_agent STATIC agent/data_agent.c)
@@ -71,6 +76,20 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/common/smart_monitor_protocol.c)
         ${CMAKE_CURRENT_SOURCE_DIR}/common
     )
     target_compile_options(smart_monitor_common PRIVATE
+        -Wall
+        -Wextra
+        -g
+    )
+endif()
+
+# Communication library
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/communication/uart_interface.c)
+    add_library(smart_monitor_communication STATIC communication/uart_interface.c)
+    target_include_directories(smart_monitor_communication PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/communication
+        ${CMAKE_CURRENT_SOURCE_DIR}/common
+    )
+    target_compile_options(smart_monitor_communication PRIVATE
         -Wall
         -Wextra
         -g

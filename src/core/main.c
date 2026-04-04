@@ -9,7 +9,8 @@
 #include "../web/api/http_server.h"
 #include "../web/webrtc/webrtc_server.h"
 #include "ffi/rust_bridge.h"
-#include "comm/uart_interface.h"
+#include "common/globals.h"
+#include "communication/uart_interface.h"
 
 #ifdef ENABLE_AUDIO
 #include "audio/audio_capture.h"
@@ -19,8 +20,8 @@
 #ifdef ENABLE_SENSORS
 #include "sensors/i2c_sensor.h"
 #include "sensors/spi_device.h"
-#include "comm/uart_interface.h"
-#include "esp32/esp32_device.h"
+#include "communication/uart_interface.h"
+#include "hardware/esp32_device.h"
 #endif
 
 #include <stdio.h>
