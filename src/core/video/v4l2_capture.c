@@ -10,16 +10,16 @@
 #include <stdlib.h>
 #include <math.h>
 
-static bool v4l2_configure_format(v4l2_capture_t* cap);
-static bool v4l2_init_mmap_buffers(v4l2_capture_t* cap);
+static bool v4l2_configure_format(V4L2Capture* cap);
+static bool v4l2_init_mmap_buffers(V4L2Capture* cap);
 
-v4l2_capture_t* v4l2_create(const char* device) {
-    v4l2_capture_t* cap = malloc(sizeof(v4l2_capture_t));
+V4L2Capture* v4l2_create(const char* device) {
+    V4L2Capture* cap = malloc(sizeof(V4L2Capture));
     if (!cap) {
         return NULL;
     }
     
-    memset(cap, 0, sizeof(v4l2_capture_t));
+    memset(cap, 0, sizeof(V4L2Capture));
     
     if (device) {
         strncpy(cap->device, device, sizeof(cap->device) - 1);
@@ -28,13 +28,13 @@ v4l2_capture_t* v4l2_create(const char* device) {
     }
     
     cap->fd = -1;
-    cap->width = 640;
-    cap->height = 480;
+    cap->width = DEFAULT_FRAME_WIDTH;
+    cap->height = DEFAULT_FRAME_HEIGHT;
     
     return cap;
 }
 
-void v4l2_destroy(v4l2_capture_t* cap) {
+void v4l2_destroy(V4L2Capture* cap) {
     if (!cap) {
         return;
     }
@@ -57,7 +57,7 @@ void v4l2_destroy(v4l2_capture_t* cap) {
     free(cap);
 }
 
-bool v4l2_initialize(v4l2_capture_t* cap, int width, int height) {
+bool v4l2_initialize(V4L2Capture* cap, FrameWidth width, FrameHeight height) {
     if (!cap) {
         return false;
     }
@@ -96,7 +96,7 @@ bool v4l2_initialize(v4l2_capture_t* cap, int width, int height) {
     return true;
 }
 
-static bool v4l2_configure_format(v4l2_capture_t* cap) {
+static bool v4l2_configure_format(V4L2Capture* cap) {
     struct v4l2_format fmt = {};
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     fmt.fmt.pix.width = cap->width;
@@ -113,11 +113,11 @@ static bool v4l2_configure_format(v4l2_capture_t* cap) {
     cap->height = fmt.fmt.pix.height;
     cap->frame_size = fmt.fmt.pix.sizeimage;
     
-    printf("Format set: %dx%d, frame size: %zu\n", cap->width, cap->height, cap->frame_size);
+    printf("Format set: %dx%d, frame size: %u\n", cap->width, cap->height, cap->frame_size);
     return true;
 }
 
-static bool v4l2_init_mmap_buffers(v4l2_capture_t* cap) {
+static bool v4l2_init_mmap_buffers(V4L2Capture* cap) {
     struct v4l2_requestbuffers req = {};
     req.count = 4;
     req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -133,14 +133,14 @@ static bool v4l2_init_mmap_buffers(v4l2_capture_t* cap) {
         return false;
     }
     
-    cap->buffers = malloc(req.count * sizeof(v4l2_buffer_t));
+    cap->buffers = malloc(req.count * sizeof(V4L2Buffer));
     if (!cap->buffers) {
         fprintf(stderr, "Failed to allocate buffer array\n");
         return false;
     }
     
     cap->buffer_count = req.count;
-    memset(cap->buffers, 0, req.count * sizeof(v4l2_buffer_t));
+    memset(cap->buffers, 0, req.count * sizeof(V4L2Buffer));
     
     for (size_t i = 0; i < cap->buffer_count; ++i) {
         struct v4l2_buffer buf = {};
@@ -166,7 +166,7 @@ static bool v4l2_init_mmap_buffers(v4l2_capture_t* cap) {
     return true;
 }
 
-bool v4l2_start_capture(v4l2_capture_t* cap) {
+bool v4l2_start_capture(V4L2Capture* cap) {
     if (!cap || !cap->initialized) {
         return false;
     }
@@ -199,7 +199,7 @@ bool v4l2_start_capture(v4l2_capture_t* cap) {
     return true;
 }
 
-void v4l2_stop_capture(v4l2_capture_t* cap) {
+void v4l2_stop_capture(V4L2Capture* cap) {
     if (!cap || cap->fd < 0) {
         return;
     }
@@ -208,7 +208,7 @@ void v4l2_stop_capture(v4l2_capture_t* cap) {
     ioctl(cap->fd, VIDIOC_STREAMOFF, &type);
 }
 
-uint8_t* v4l2_read_frame(v4l2_capture_t* cap, size_t* frame_size) {
+uint8_t* v4l2_read_frame(V4L2Capture* cap, ByteCount* frame_size) {
     if (!cap || !frame_size) {
         return NULL;
     }
@@ -297,12 +297,12 @@ uint8_t* v4l2_read_frame(v4l2_capture_t* cap, size_t* frame_size) {
     return frame_data;
 }
 
-uint8_t* v4l2_read_frame_raw(v4l2_capture_t* cap, size_t* frame_size) {
+uint8_t* v4l2_read_frame_raw(V4L2Capture* cap, ByteCount* frame_size) {
     uint8_t* frame_data = v4l2_read_frame(cap, frame_size);
     
     if (!frame_data) {
         // Return mock frame for testing
-        size_t mock_size = cap->width * cap->height * 2;
+        ByteCount mock_size = cap->width * cap->height * 2;
         uint8_t* mock_frame = malloc(mock_size);
         if (mock_frame) {
             memset(mock_frame, 128, mock_size);
@@ -314,18 +314,18 @@ uint8_t* v4l2_read_frame_raw(v4l2_capture_t* cap, size_t* frame_size) {
     return frame_data;
 }
 
-bool v4l2_is_initialized(const v4l2_capture_t* cap) {
+bool v4l2_is_initialized(const V4L2Capture* cap) {
     return cap && cap->initialized;
 }
 
-int v4l2_get_width(const v4l2_capture_t* cap) {
+FrameWidth v4l2_get_width(const V4L2Capture* cap) {
     return cap ? cap->width : 0;
 }
 
-int v4l2_get_height(const v4l2_capture_t* cap) {
+FrameHeight v4l2_get_height(const V4L2Capture* cap) {
     return cap ? cap->height : 0;
 }
 
-size_t v4l2_get_frame_size(const v4l2_capture_t* cap) {
+ByteCount v4l2_get_frame_size(const V4L2Capture* cap) {
     return cap ? cap->frame_size : 0;
 }

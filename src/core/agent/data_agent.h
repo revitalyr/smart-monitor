@@ -209,7 +209,7 @@ void data_agent_set_update_interval(DataAgent* agent, uint32_t interval_ms);
  * @param audio_cb Audio JSON callback function
  * @param system_cb System JSON callback function
  */
-void data_agent_set_http_callbacks(data_agent_t* agent, 
+void data_agent_set_http_callbacks(DataAgent* agent, 
                                    char* (*sensor_cb)(void),
                                    char* (*audio_cb)(void),
                                    char* (*system_cb)(void));
@@ -217,42 +217,42 @@ void data_agent_set_http_callbacks(data_agent_t* agent,
 /**
  * @brief Set video JSON callback
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @param video_cb Video JSON callback function
  */
-void data_agent_set_video_callback(data_agent_t* agent, char* (*video_cb)(void));
+void data_agent_set_video_callback(DataAgent* agent, char* (*video_cb)(void));
 
 /**
  * @brief Get sensor data as JSON string
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @return Allocated JSON string (caller must free) or NULL on failure
  */
-char* data_agent_get_sensor_json(data_agent_t* agent);
+char* data_agent_get_sensor_json(DataAgent* agent);
 
 /**
  * @brief Get audio data as JSON string
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @return Allocated JSON string (caller must free) or NULL on failure
  */
-char* data_agent_get_audio_json(data_agent_t* agent);
+char* data_agent_get_audio_json(DataAgent* agent);
 
 /**
  * @brief Get video data as JSON string
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @return Allocated JSON string (caller must free) or NULL on failure
  */
-char* data_agent_get_video_json(data_agent_t* agent);
+char* data_agent_get_video_json(DataAgent* agent);
 
 /**
- * @brief Get system status as JSON string
+ * @brief Get system data as JSON string
  * 
- * @param agent Pointer to data_agent_t instance
+ * @param agent Pointer to DataAgent instance
  * @return Allocated JSON string (caller must free) or NULL on failure
  */
-char* data_agent_get_system_json(data_agent_t* agent);
+char* data_agent_get_system_json(DataAgent* agent);
 
 /**
  * @brief Generate sensor JSON data

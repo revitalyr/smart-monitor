@@ -560,28 +560,28 @@ void data_agent_set_http_callbacks(data_agent_t* agent,
     agent->system_json_callback = system_cb;
 }
 
-void data_agent_set_video_callback(data_agent_t* agent, char* (*video_cb)(void)) {
+void data_agent_set_video_callback(DataAgent* agent, char* (*video_cb)(void)) {
     if (!agent) return;
     
     agent->video_json_callback = video_cb;
 }
 
-char* data_agent_get_sensor_json(data_agent_t* agent) {
+char* data_agent_get_sensor_json(DataAgent* agent) {
     if (!agent || !agent->sensor_json_callback) return NULL;
     return agent->sensor_json_callback();
 }
 
-char* data_agent_get_audio_json(data_agent_t* agent) {
+char* data_agent_get_audio_json(DataAgent* agent) {
     if (!agent || !agent->audio_json_callback) return NULL;
     return agent->audio_json_callback();
 }
 
-char* data_agent_get_video_json(data_agent_t* agent) {
+char* data_agent_get_video_json(DataAgent* agent) {
     if (!agent || !agent->video_json_callback) return NULL;
     return agent->video_json_callback();
 }
 
-char* data_agent_get_system_json(data_agent_t* agent) {
+char* data_agent_get_system_json(DataAgent* agent) {
     if (!agent || !agent->system_json_callback) return NULL;
     return agent->system_json_callback();
 }
@@ -615,21 +615,20 @@ static void* agent_worker_thread(void* arg) {
         
         // Update audio data
         if (agent->config.enable_audio) {
-            audio_data_t audio_data;
+            AudioData audio_data = {0};
             
             if (agent->config.enable_simulation) {
-                generate_realistic_audio_data(&audio_data);
+                generate_realistic_audio_data((audio_data_t*)&audio_data);
             } else if (agent->audio && agent->noise_detector) {
                 // Read from real audio
                 uint8_t audio_samples[1024];
                 int samples_read = audio_read_samples(agent->audio, audio_samples, sizeof(audio_samples));
                 if (samples_read > 0) {
                     noise_metrics_t metrics = noise_detector_analyze(agent->noise_detector, audio_samples, samples_read);
-                    audio_data.noise_level = metrics.m_noise_level;
-                    audio_data.voice_activity = metrics.m_voice_activity;
-                    audio_data.baby_crying = metrics.m_baby_crying_detected;
-                    audio_data.screaming = metrics.m_screaming_detected;
-                    audio_data.peak_frequency = 1000 + (rand() % 3000);
+                    audio_data.audio_level = metrics.m_noise_level;
+                    audio_data.voice_detected = metrics.m_voice_activity;
+                    audio_data.audio_alert = metrics.m_baby_crying_detected || metrics.m_screaming_detected;
+                    audio_data.peak_frequency_hz = 1000 + (rand() % 3000);
                 }
             }
             
@@ -641,7 +640,7 @@ static void* agent_worker_thread(void* arg) {
         
         // Process video and motion detection
         if (agent->config.enable_camera && agent->camera) {
-            size_t frame_size = 0;
+            ByteCount frame_size = 0;
             uint8_t* frame_data = v4l2_read_frame(agent->camera, &frame_size);
             
             if (frame_data && frame_size > 0) {
@@ -652,7 +651,7 @@ static void* agent_worker_thread(void* arg) {
                     MotionResult result = rust_detector_detect_motion_advanced(
                         agent->motion_detector,
                         agent->prev_frame,
-                        (const uint8_t*)frame_data,
+                        frame_data,
                         DEFAULT_FRAME_WIDTH,
                         DEFAULT_FRAME_HEIGHT,
                         (MotionThreshold)(agent->config.motion_threshold * 255)
