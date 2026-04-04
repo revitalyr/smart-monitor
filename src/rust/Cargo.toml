@@ -1,0 +1,17 @@
+[package]
+name = "smart_monitor_types"
+version = "2.0.0"
+edition = "2021"
+authors = ["Smart Monitor Team"]
+description = "Centralized type definitions and constants for Smart Monitor system"
+license = "MIT"
+
+[dependencies]
+
+[lib]
+name = "smart_monitor_types"
+crate-type = ["rlib", "staticlib", "cdylib"]
+
+[features]
+default = []
+ffi = []

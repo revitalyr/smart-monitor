@@ -5,6 +5,7 @@
  * This file initializes all hardware components, starts the network services,
  * and runs the main processing loop for video and sensor data.
  */
+#include "types.h"
 #include "video/v4l2_capture.h"
 #include "../web/api/http_server.h"
 #include "../web/webrtc/webrtc_server.h"
@@ -20,7 +21,6 @@
 #ifdef ENABLE_SENSORS
 #include "sensors/i2c_sensor.h"
 #include "sensors/spi_device.h"
-#include "communication/uart_interface.h"
 #include "hardware/esp32_device.h"
 #endif
 

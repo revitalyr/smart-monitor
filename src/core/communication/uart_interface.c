@@ -8,17 +8,15 @@
 #include <errno.h>
 #include <time.h>
 
-#define DEFAULT_BAUDRATE 115200
-#define UART_BUFFER_SIZE 1024
-
-uart_interface_t* uart_create(const char* device_path) {
-    uart_interface_t* uart = malloc(sizeof(uart_interface_t));
+// UART interface implementation
+UartInterface* uart_create(const char* device_path) {
+    UartInterface* uart = malloc(sizeof(UartInterface));
     if (!uart) {
         return NULL;
     }
     
-    memset(uart, 0, sizeof(uart_interface_t));
-    uart->device_path = strdup(device_path ? device_path : "/dev/ttyS0");
+    memset(uart, 0, sizeof(UartInterface));
+    uart->device_path = strdup(device_path ? device_path : UART_DEFAULT_DEVICE);
     uart->baudrate = DEFAULT_BAUDRATE;
     uart->data_bits = 8;
     uart->stop_bits = 1;
@@ -28,15 +26,15 @@ uart_interface_t* uart_create(const char* device_path) {
     return uart;
 }
 
-uart_interface_t* uart_create_mock(void) {
-    uart_interface_t* uart = uart_create("/mock/uart");
+UartInterface* uart_create_mock(void) {
+    UartInterface* uart = uart_create("/mock/uart");
     if (uart) {
         uart->initialized = true;
     }
     return uart;
 }
 
-bool uart_initialize(uart_interface_t* uart, int baudrate) {
+bool uart_initialize(UartInterface* uart, BaudRate baudrate) {
     if (!uart) {
         return false;
     }
@@ -48,160 +46,141 @@ bool uart_initialize(uart_interface_t* uart, int baudrate) {
     if (uart->fd < 0) {
         // Use mock mode
         uart->initialized = true;
+        printf("INFO: Using mock UART mode for device %s\n", uart->device_path);
         return true;
     }
     
-    // Configure serial port
+    // Configure real UART
     struct termios options;
     tcgetattr(uart->fd, &options);
     
-    // Set baudrate
-    speed_t speed = B115200;
-    switch (baudrate) {
-        case 9600: speed = B9600; break;
-        case 19200: speed = B19200; break;
-        case 38400: speed = B38400; break;
-        case 57600: speed = B57600; break;
-        case 115200: speed = B115200; break;
-        default: speed = B115200; break;
-    }
-    cfsetispeed(&options, speed);
-    cfsetospeed(&options, speed);
+    // Set baud rate
+    cfsetispeed(&options, baudrate);
+    cfsetospeed(&options, baudrate);
     
-    // Configure data format
+    // 8N1 configuration
+    options.c_cflag &= ~PARENB;
+    options.c_cflag &= ~CSTOPB;
+    options.c_cflag &= ~CSIZE;
+    options.c_cflag |= CS8;
+    
+    // Enable receiver, ignore modem control lines
     options.c_cflag |= (CLOCAL | CREAD);
-    options.c_cflag &= ~PARENB; // No parity
-    options.c_cflag &= ~CSTOPB; // 1 stop bit
-    options.c_cflag &= ~CSIZE; // Clear data bits
-    options.c_cflag |= CS8; // 8 data bits
     
-    // Set raw mode
+    // Raw input mode
     options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-    options.c_iflag &= ~(IXON | IXOFF | IXANY);
+    
+    // Raw output mode
     options.c_oflag &= ~OPOST;
     
     // Set timeout
     options.c_cc[VMIN] = 0;
-    options.c_cc[VTIME] = 10; // 1 second timeout
+    options.c_cc[VTIME] = UART_TIMEOUT_MS / 100;
     
     tcsetattr(uart->fd, TCSANOW, &options);
-    
     uart->initialized = true;
+    
     return true;
 }
 
-void uart_destroy(uart_interface_t* uart) {
-    if (!uart) {
-        return;
+void uart_destroy(UartInterface* uart) {
+    if (uart) {
+        if (uart->fd >= 0) {
+            close(uart->fd);
+        }
+        if (uart->device_path) {
+            free(uart->device_path);
+        }
+        free(uart);
     }
-    
-    if (uart->fd >= 0) {
-        close(uart->fd);
-    }
-    
-    if (uart->device_path) {
-        free(uart->device_path);
-    }
-    
-    free(uart);
 }
 
-bool uart_write(uart_interface_t* uart, const char* data, int len) {
-    if (!uart || !uart->initialized || !data) {
+bool uart_write(UartInterface* uart, const char* data, ByteCount len) {
+    if (!uart || !uart->initialized || !data || len == 0) {
         return false;
     }
     
-    if (uart->fd < 0) {
-        // Mock mode - just print to stdout for demo
-        printf("UART TX: %.*s\n", len, data);
+    if (uart->fd >= 0) {
+        // Real UART write
+        ByteCount written = write(uart->fd, data, len);
+        return written == len;
+    } else {
+        // Mock mode - simulate write
+        printf("UART WRITE: %.*s\n", (int)len, data);
         return true;
     }
-    
-    int written = write(uart->fd, data, len);
-    return written == len;
 }
 
-int uart_read(uart_interface_t* uart, char* buffer, int max_len) {
-    if (!uart || !uart->initialized || !buffer) {
-        return -1;
-    }
-    
-    if (uart->fd < 0) {
-        // Mock mode - simulate incoming data
-        static uint32_t counter = 0;
-        counter++;
-        
-        if (counter % 100 == 0) {
-            snprintf(buffer, max_len, "STATUS:OK,MOTION:%d,TEMP:%d\n", 
-                    counter % 10, 20 + (counter % 10));
-            return strlen(buffer);
-        }
+ByteCount uart_read(UartInterface* uart, char* buffer, ByteCount max_len) {
+    if (!uart || !uart->initialized || !buffer || max_len == 0) {
         return 0;
     }
     
-    return read(uart->fd, buffer, max_len);
+    if (uart->fd >= 0) {
+        // Real UART read
+        return read(uart->fd, buffer, max_len);
+    } else {
+        // Mock mode - simulate read
+        printf("UART READ: Waiting for data (mock)\n");
+        return 0;
+    }
 }
 
-bool uart_send_command(uart_interface_t* uart, const char* cmd, char* response, int max_len) {
+bool uart_send_command(UartInterface* uart, const char* cmd, char* response, ByteCount max_len) {
     if (!uart || !cmd || !response) {
         return false;
     }
     
     // Send command
-    char cmd_with_crlf[256];
-    snprintf(cmd_with_crlf, sizeof(cmd_with_crlf), "%s\r\n", cmd);
-    
-    if (!uart_write(uart, cmd_with_crlf, strlen(cmd_with_crlf))) {
+    ByteCount cmd_len = strlen(cmd);
+    if (!uart_write(uart, cmd, cmd_len)) {
         return false;
+    }
+    
+    // Add newline if not present
+    if (cmd[cmd_len - 1] != '\n') {
+        uart_write(uart, "\n", 1);
     }
     
     // Wait for response
     usleep(100000); // 100ms delay
     
     // Read response
-    int len = uart_read(uart, response, max_len - 1);
-    if (len > 0) {
-        response[len] = '\0';
-        
-        // Remove trailing CRLF
-        while (len > 0 && (response[len-1] == '\r' || response[len-1] == '\n')) {
-            response[--len] = '\0';
-        }
-        return true;
-    }
+    ByteCount read_len = uart_read(uart, response, max_len - 1);
+    response[read_len] = '\0';
     
-    response[0] = '\0';
-    return false;
+    return read_len > 0;
 }
 
-void uart_process_commands(uart_interface_t* uart) {
-    char buffer[UART_BUFFER_SIZE];
+void uart_process_commands(UartInterface* uart) {
+    if (!uart || !uart->initialized) {
+        return;
+    }
     
-    while (uart_read(uart, buffer, sizeof(buffer) - 1) > 0) {
-        buffer[strlen(buffer)] = '\0';
+    char buffer[MAX_BUFFER_SIZE];
+    ByteCount len = uart_read(uart, buffer, sizeof(buffer) - 1);
+    
+    if (len > 0) {
+        buffer[len] = '\0';
+        printf("UART received: %s\n", buffer);
         
-        // Process commands
+        // Process commands here
         if (strstr(buffer, "STATUS")) {
-            uart_write(uart, "OK:RUNNING,MOTION:0,TEMP:22\n", 27);
-        } else if (strstr(buffer, "RESET")) {
-            uart_write(uart, "OK:RESET\n", 10);
+            uart_write(uart, "OK: System ready\n", 18);
         } else if (strstr(buffer, "PING")) {
             uart_write(uart, "PONG\n", 5);
-        } else {
-            uart_write(uart, "ERROR:UNKNOWN\n", 14);
         }
     }
 }
 
-void uart_log_message(uart_interface_t* uart, const char* level, const char* message) {
-    char log_msg[256];
-    time_t now = time(NULL);
-    struct tm* tm_info = localtime(&now);
+void uart_log_message(UartInterface* uart, const char* level, const char* message) {
+    if (!uart || !level || !message) {
+        return;
+    }
     
-    snprintf(log_msg, sizeof(log_msg), "[%04d-%02d-%02d %02d:%02d:%02d] %s: %s\r\n",
-            tm_info->tm_year + 1900, tm_info->tm_mon + 1, tm_info->tm_mday,
-            tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec,
-            level, message);
+    TimestampMs timestamp = (TimestampMs)time(NULL) * 1000;
+    char log_entry[MAX_COMMAND_LENGTH];
+    snprintf(log_entry, sizeof(log_entry), "[%lu] %s: %s\n", timestamp, level, message);
     
-    uart_write(uart, log_msg, strlen(log_msg));
+    uart_write(uart, log_entry, strlen(log_entry));
 }

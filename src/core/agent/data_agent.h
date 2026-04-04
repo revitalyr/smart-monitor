@@ -11,9 +11,9 @@
 #ifndef DATA_AGENT_H
 #define DATA_AGENT_H
 
+#include "../common/types.h"
 #include "../common/smart_monitor_protocol.h"
-#include <stdint.h>
-#include <stdbool.h>
+#include "../ffi/rust_bridge.h"
 #include <pthread.h>
 
 #ifdef __cplusplus
@@ -23,7 +23,7 @@ extern "C" {
 /**
  * @brief Opaque data agent structure
  */
-typedef struct data_agent data_agent_t;
+typedef struct data_agent DataAgent;
 
 /**
  * @brief Agent configuration structure
@@ -36,11 +36,11 @@ typedef struct {
     bool enable_audio;         /**< Enable audio processing */
     bool enable_sensors;       /**< Enable sensor reading */
     bool enable_simulation;     /**< Enable physics simulation */
-    uint32_t update_interval_ms; /**< Update interval in milliseconds */
+    IntervalMs update_interval_ms; /**< Update interval in milliseconds */
     char* video_source;        /**< Video device path */
-    float motion_threshold;     /**< Motion detection threshold */
-    float audio_threshold;      /**< Audio detection threshold */
-} agent_config_t;
+    MotionThreshold motion_threshold; /**< Motion detection threshold */
+    MotionThreshold audio_threshold; /**< Audio detection threshold */
+} AgentConfig;
 
 /**
  * @brief Agent statistics structure
@@ -49,13 +49,13 @@ typedef struct {
  * and debugging purposes.
  */
 typedef struct {
-    uint32_t frames_processed;  /**< Total video frames processed */
-    uint32_t motion_events;     /**< Total motion events detected */
-    uint32_t audio_events;      /**< Total audio events detected */
-    uint32_t sensor_updates;    /**< Total sensor updates processed */
-    uint64_t start_time;        /**< Agent start timestamp */
-    uint32_t uptime;           /**< Agent uptime in seconds */
-} agent_stats_t;
+    FrameCount frames_processed;  /**< Total video frames processed */
+    FrameCount motion_events;     /**< Total motion events detected */
+    FrameCount audio_events;      /**< Total audio events detected */
+    FrameCount sensor_updates;    /**< Total sensor updates processed */
+    TimestampMs start_time;        /**< Agent start timestamp */
+    DurationMs uptime;           /**< Agent uptime in seconds */
+} AgentStats;
 
 /**
  * @brief Sensor data callback function type
@@ -63,7 +63,7 @@ typedef struct {
  * @param data Pointer to sensor data structure
  * @param user_data User-provided data pointer
  */
-typedef void (*sensor_data_callback_t)(const sensor_data_t* data, void* user_data);
+typedef void (*SensorDataCallback)(const SensorData* data, void* user_data);
 
 /**
  * @brief Audio data callback function type
@@ -71,7 +71,7 @@ typedef void (*sensor_data_callback_t)(const sensor_data_t* data, void* user_dat
  * @param data Pointer to audio data structure
  * @param user_data User-provided data pointer
  */
-typedef void (*audio_data_callback_t)(const audio_data_t* data, void* user_data);
+typedef void (*AudioDataCallback)(const AudioData* data, void* user_data);
 
 /**
  * @brief Motion alert callback function type
@@ -79,7 +79,7 @@ typedef void (*audio_data_callback_t)(const audio_data_t* data, void* user_data)
  * @param alert Pointer to motion alert structure
  * @param user_data User-provided data pointer
  */
-typedef void (*motion_alert_callback_t)(const motion_alert_t* alert, void* user_data);
+typedef void (*MotionAlertCallback)(const MotionAlert* alert, void* user_data);
 
 /**
  * @brief System status callback function type
@@ -87,15 +87,15 @@ typedef void (*motion_alert_callback_t)(const motion_alert_t* alert, void* user_
  * @param status Pointer to system status structure
  * @param user_data User-provided data pointer
  */
-typedef void (*system_status_callback_t)(const system_status_t* status, void* user_data);
+typedef void (*SystemStatusCallback)(const SystemStatus* status, void* user_data);
 
 /**
  * @brief Create data agent instance
  * 
  * @param config Pointer to agent configuration structure
- * @return Pointer to data_agent_t instance or NULL on failure
+ * @return Pointer to DataAgent instance or NULL on failure
  */
-data_agent_t* data_agent_create(const agent_config_t* config);
+DataAgent* data_agent_create(const AgentConfig* config);
 
 /**
  * @brief Destroy data agent and free resources

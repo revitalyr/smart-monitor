@@ -4,44 +4,44 @@
 
 // Mock implementations of Rust functions for testing without Rust compilation
 
-rust_motion_detector_t* rust_detector_create(void) {
-    rust_motion_detector_t* detector = malloc(sizeof(rust_motion_detector_t));
+MotionDetector* rust_detector_create(void) {
+    MotionDetector* detector = malloc(sizeof(MotionDetector));
     if (detector) {
-        memset(detector, 0, sizeof(rust_motion_detector_t));
+        memset(detector, 0, sizeof(MotionDetector));
         detector->initialized = true;
     }
     return detector;
 }
 
-bool rust_detector_initialize(rust_motion_detector_t* detector) {
+bool rust_detector_initialize(MotionDetector* detector) {
     (void)detector;
     return true;
 }
 
-void rust_detector_destroy(rust_motion_detector_t* detector) {
+void rust_detector_destroy(MotionDetector* detector) {
     if (detector) {
         free(detector);
     }
 }
 
-bool rust_detector_detect_motion(rust_motion_detector_t* detector,
-                                          const uint8_t* prev,
-                                          const uint8_t* curr,
+bool rust_detector_detect_motion(MotionDetector* detector,
+                                          const FrameBuffer prev,
+                                          const FrameBuffer curr,
                                           size_t len,
-                                          uint8_t threshold) {
+                                          MotionThreshold threshold) {
     (void)detector; (void)prev; (void)curr; (void)len; (void)threshold;
     return false;
 }
 
-motion_result_t rust_detector_detect_motion_advanced(rust_motion_detector_t* detector,
-                                                 const uint8_t* prev,
-                                                 const uint8_t* curr,
-                                                 uint32_t width,
-                                                 uint32_t height,
-                                                 uint8_t threshold) {
+MotionResult rust_detector_detect_motion_advanced(MotionDetector* detector,
+                                                 const FrameBuffer prev,
+                                                 const FrameBuffer curr,
+                                                 FrameWidth width,
+                                                 FrameHeight height,
+                                                 MotionThreshold threshold) {
     (void)detector; (void)prev; (void)curr; (void)width; (void)height; (void)threshold;
     
-    motion_result_t result;
+    MotionResult result;
     result.motion_detected = false;
     result.motion_level = 0.0f;
     result.changed_pixels = 0;
@@ -55,16 +55,16 @@ bool motion_init(void) {
 
 void motion_cleanup(void) {}
 
-bool detect_motion(const uint8_t* prev, const uint8_t* curr, size_t len, uint8_t threshold) {
+bool detect_motion(const FrameBuffer prev, const FrameBuffer curr, size_t len, MotionThreshold threshold) {
     (void)prev; (void)curr; (void)len; (void)threshold;
     return false;
 }
 
-motion_result_t detect_motion_advanced(const uint8_t* prev, const uint8_t* curr, 
-                                   uint32_t width, uint32_t height, uint8_t threshold) {
+MotionResult detect_motion_advanced(const FrameBuffer prev, const FrameBuffer curr, 
+                                   FrameWidth width, FrameHeight height, MotionThreshold threshold) {
     (void)prev; (void)curr; (void)width; (void)height; (void)threshold;
     
-    motion_result_t result;
+    MotionResult result;
     result.motion_detected = false;
     result.motion_level = 0.0f;
     result.changed_pixels = 0;

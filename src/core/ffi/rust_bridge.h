@@ -8,31 +8,29 @@
 #ifndef RUST_BRIDGE_H
 #define RUST_BRIDGE_H
 
-#include <stdint.h>
-#include <stdbool.h>
-#include <stddef.h>
+#include "types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @struct motion_result_t
+ * @struct MotionResult
  * @brief Data structure returned by the motion detection algorithm.
  */
 typedef struct {
     bool motion_detected;    /**< True if motion exceeds thresholds */
-    float motion_level;      /**< Normalized motion level (0.0 - 1.0) */
-    uint32_t changed_pixels; /**< Count of pixels identified as changed */
-} motion_result_t;
+    MotionLevel motion_level; /**< Normalized motion level (0.0 - 1.0) */
+    PixelCount changed_pixels; /**< Count of pixels identified as changed */
+} MotionResult;
 
 /**
- * @struct rust_motion_detector_t
+ * @struct MotionDetector
  * @brief Handle for the Rust-based motion detection engine.
  */
 typedef struct {
     bool initialized;
-} rust_motion_detector_t;
+} MotionDetector;
 
 /* --- Rust FFI functions (Implemented in Rust) --- */
 
@@ -46,10 +44,10 @@ typedef struct {
  * @return true if motion was detected.
  */
 extern bool detect_motion(
-    const uint8_t* prev,
-    const uint8_t* curr,
+    const FrameBuffer prev,
+    const FrameBuffer curr,
     size_t len,
-    uint8_t threshold
+    MotionThreshold threshold
 );
 
 /**
@@ -60,14 +58,14 @@ extern bool detect_motion(
  * @param width Frame width.
  * @param height Frame height.
  * @param threshold Pixel intensity difference threshold.
- * @return motion_result_t detailed results.
+ * @return MotionResult detailed results.
  */
-extern motion_result_t detect_motion_advanced(
-    const uint8_t* prev,
-    const uint8_t* curr,
-    uint32_t width,
-    uint32_t height,
-    uint8_t threshold
+extern MotionResult detect_motion_advanced(
+    const FrameBuffer prev,
+    const FrameBuffer curr,
+    FrameWidth width,
+    FrameHeight height,
+    MotionThreshold threshold
 );
 
 extern bool motion_init(void);
@@ -77,38 +75,38 @@ extern void motion_cleanup(void);
 
 /**
  * @brief Creates a new motion detector instance.
- * @return rust_motion_detector_t* Pointer to the new detector.
+ * @return MotionDetector* Pointer to the new detector.
  */
-rust_motion_detector_t* rust_detector_create(void);
-void rust_detector_destroy(rust_motion_detector_t* detector);
+MotionDetector* rust_detector_create(void);
+void rust_detector_destroy(MotionDetector* detector);
 
 /**
  * @brief Initializes the underlying Rust engine.
  */
-bool rust_detector_initialize(rust_motion_detector_t* detector);
-void rust_detector_cleanup(rust_motion_detector_t* detector);
+bool rust_detector_initialize(MotionDetector* detector);
+void rust_detector_cleanup(MotionDetector* detector);
 
 /**
  * @brief C-friendly wrapper for basic motion detection.
  */
 bool rust_detector_detect_motion(
-    rust_motion_detector_t* detector,
-    const uint8_t* prev,
-    const uint8_t* curr,
+    MotionDetector* detector,
+    const FrameBuffer prev,
+    const FrameBuffer curr,
     size_t len,
-    uint8_t threshold
+    MotionThreshold threshold
 );
 
 /**
  * @brief C-friendly wrapper for advanced motion detection.
  */
-motion_result_t rust_detector_detect_motion_advanced(
-    rust_motion_detector_t* detector,
-    const uint8_t* prev,
-    const uint8_t* curr,
-    uint32_t width,
-    uint32_t height,
-    uint8_t threshold
+MotionResult rust_detector_detect_motion_advanced(
+    MotionDetector* detector,
+    const FrameBuffer prev,
+    const FrameBuffer curr,
+    FrameWidth width,
+    FrameHeight height,
+    MotionThreshold threshold
 );
 
 #ifdef __cplusplus
