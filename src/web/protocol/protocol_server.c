@@ -11,47 +11,46 @@
 #include <fcntl.h>
 
 #define MAX_CLIENTS 32
-#define BUFFER_SIZE 4096
 
-struct protocol_server {
-    server_config_t config;
-    data_agent_t* agent;
+struct ProtocolServer {
+    ServerConfig config;
+    DataAgent* agent;
     
-    int server_fd;
+    FileDescriptor server_fd;
     pthread_t accept_thread;
     volatile bool running;
     
-    client_connection_t clients[MAX_CLIENTS];
+    ClientConnection clients[MAX_CLIENTS];
     int client_count;
     
     pthread_mutex_t clients_mutex;
-    server_stats_t stats;
+    ServerStats stats;
 };
 
 // Helper function to get current timestamp
-static uint32_t get_timestamp_ms() {
+static TimestampMs get_timestamp_ms() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint32_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+    return (TimestampMs)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
 }
 
 // Send protocol message to client
-static bool send_protocol_message(int client_fd, const protocol_header_t* header, 
-                              const void* payload, size_t payload_size) {
+static bool send_protocol_message(FileDescriptor client_fd, const ProtocolHeader* header, 
+                              const void* payload, ByteCount payload_size) {
     // Create complete message
-    size_t total_size = sizeof(protocol_header_t) + payload_size;
+    ByteCount total_size = sizeof(ProtocolHeader) + payload_size;
     uint8_t* message = malloc(total_size);
     if (!message) return false;
     
     // Copy header and calculate checksum
-    protocol_header_t header_copy = *header;
+    ProtocolHeader header_copy = *header;
     if (payload_size > 0) {
-        memcpy(message + sizeof(protocol_header_t), payload, payload_size);
+        memcpy(message + sizeof(ProtocolHeader), payload, payload_size);
     }
     header_copy.checksum = protocol_calculate_crc(message, total_size);
     
     // Copy header with checksum
-    memcpy(message, &header_copy, sizeof(protocol_header_t));
+    memcpy(message, &header_copy, sizeof(ProtocolHeader));
     
     // Send message
     ssize_t sent = send(client_fd, message, total_size, MSG_NOSIGNAL);
@@ -61,12 +60,12 @@ static bool send_protocol_message(int client_fd, const protocol_header_t* header
 }
 
 // Handle incoming message from client
-static void handle_client_message(protocol_server_t* server, client_connection_t* client) {
-    if (client->buffer_len < sizeof(protocol_header_t)) {
+static void handle_client_message(ProtocolServer* server, ClientConnection* client) {
+    if (client->buffer_len < sizeof(ProtocolHeader)) {
         return; // Not enough data for header
     }
     
-    protocol_header_t* header = (protocol_header_t*)client->buffer;
+    ProtocolHeader* header = (ProtocolHeader*)client->buffer;
     
     // Validate header
     if (!protocol_validate_header(header)) {
@@ -75,21 +74,21 @@ static void handle_client_message(protocol_server_t* server, client_connection_t
     }
     
     // Check if we have complete message
-    size_t expected_size = sizeof(protocol_header_t) + header->payload_length;
+    ByteCount expected_size = sizeof(ProtocolHeader) + header->payload_length;
     if (client->buffer_len < expected_size) {
         return; // Incomplete message
     }
     
-    void* payload = client->buffer + sizeof(protocol_header_t);
+    void* payload = client->buffer + sizeof(ProtocolHeader);
     
     // Process message based on type
     switch (header->type) {
         case MSG_TYPE_COMMAND: {
-            if (header->payload_length >= sizeof(command_payload_t)) {
-                command_payload_t* cmd = (command_payload_t*)payload;
+            if (header->payload_length >= sizeof(CommandPayload)) {
+                CommandPayload* cmd = (CommandPayload*)payload;
                 
                 // Handle commands
-                response_payload_t response = {0};
+                ResponsePayload response = {0};
                 response.status = 0; // Success
                 
                 switch (cmd->command) {
@@ -123,10 +122,10 @@ static void handle_client_message(protocol_server_t* server, client_connection_t
                 }
                 
                 // Send response
-                protocol_header_t response_header;
+                ProtocolHeader response_header;
                 protocol_create_header(&response_header, MSG_TYPE_RESPONSE, 
                                     server->stats.messages_sent + 1, get_timestamp_ms(), 
-                                    sizeof(response_payload_t));
+                                    sizeof(ResponsePayload));
                 
                 send_protocol_message(client->socket_fd, &response_header, 
                                   &response, sizeof(response));
@@ -136,7 +135,7 @@ static void handle_client_message(protocol_server_t* server, client_connection_t
         
         case MSG_TYPE_HEARTBEAT: {
             // Send heartbeat response
-            protocol_header_t response_header;
+            ProtocolHeader response_header;
             protocol_create_header(&response_header, MSG_TYPE_HEARTBEAT, 
                                 server->stats.messages_sent + 1, get_timestamp_ms(), 0);
             
@@ -150,7 +149,7 @@ static void handle_client_message(protocol_server_t* server, client_connection_t
     }
     
     // Remove processed message from buffer
-    size_t remaining = client->buffer_len - expected_size;
+    ByteCount remaining = client->buffer_len - expected_size;
     if (remaining > 0) {
         memmove(client->buffer, client->buffer + expected_size, remaining);
     }
@@ -162,13 +161,13 @@ static void handle_client_message(protocol_server_t* server, client_connection_t
 
 // Accept new connections
 static void* accept_thread_func(void* arg) {
-    protocol_server_t* server = (protocol_server_t*)arg;
+    ProtocolServer* server = (ProtocolServer*)arg;
     
     while (server->running) {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
         
-        int client_fd = accept(server->server_fd, (struct sockaddr*)&client_addr, &client_len);
+        FileDescriptor client_fd = accept(server->server_fd, (struct sockaddr*)&client_addr, &client_len);
         if (client_fd < 0) {
             if (errno != EINTR && errno != EAGAIN) {
                 perror("accept failed");
@@ -220,56 +219,56 @@ static void* accept_thread_func(void* arg) {
 }
 
 // Agent callbacks
-static void sensor_data_callback(const sensor_data_t* data, void* user_data) {
-    protocol_server_t* server = (protocol_server_t*)user_data;
+static void sensor_data_callback(const SensorData* data, void* user_data) {
+    ProtocolServer* server = (ProtocolServer*)user_data;
     
-    protocol_header_t header;
+    ProtocolHeader header;
     protocol_create_header(&header, MSG_TYPE_SENSOR_DATA, 
                         server->stats.messages_sent + 1, get_timestamp_ms(), 
-                        sizeof(sensor_data_t));
+                        sizeof(SensorData));
     
-    protocol_server_broadcast_message(server, &header, data, sizeof(sensor_data_t));
+    protocol_server_broadcast_message(server, &header, data, sizeof(SensorData));
 }
 
-static void audio_data_callback(const audio_data_t* data, void* user_data) {
-    protocol_server_t* server = (protocol_server_t*)user_data;
+static void audio_data_callback(const AudioData* data, void* user_data) {
+    ProtocolServer* server = (ProtocolServer*)user_data;
     
-    protocol_header_t header;
+    ProtocolHeader header;
     protocol_create_header(&header, MSG_TYPE_AUDIO_DATA, 
                         server->stats.messages_sent + 1, get_timestamp_ms(), 
-                        sizeof(audio_data_t));
+                        sizeof(AudioData));
     
-    protocol_server_broadcast_message(server, &header, data, sizeof(audio_data_t));
+    protocol_server_broadcast_message(server, &header, data, sizeof(AudioData));
 }
 
-static void motion_alert_callback(const motion_alert_t* alert, void* user_data) {
-    protocol_server_t* server = (protocol_server_t*)user_data;
+static void motion_alert_callback(const MotionAlert* alert, void* user_data) {
+    ProtocolServer* server = (ProtocolServer*)user_data;
     
-    protocol_header_t header;
+    ProtocolHeader header;
     protocol_create_header(&header, MSG_TYPE_MOTION_ALERT, 
                         server->stats.messages_sent + 1, get_timestamp_ms(), 
-                        sizeof(motion_alert_t));
+                        sizeof(MotionAlert));
     
-    protocol_server_broadcast_message(server, &header, alert, sizeof(motion_alert_t));
+    protocol_server_broadcast_message(server, &header, alert, sizeof(MotionAlert));
 }
 
-static void system_status_callback(const system_status_t* status, void* user_data) {
-    protocol_server_t* server = (protocol_server_t*)user_data;
+static void system_status_callback(const SystemStatus* status, void* user_data) {
+    ProtocolServer* server = (ProtocolServer*)user_data;
     
-    protocol_header_t header;
+    ProtocolHeader header;
     protocol_create_header(&header, MSG_TYPE_SYSTEM_STATUS, 
                         server->stats.messages_sent + 1, get_timestamp_ms(), 
-                        sizeof(system_status_t));
+                        sizeof(SystemStatus));
     
-    protocol_server_broadcast_message(server, &header, status, sizeof(system_status_t));
+    protocol_server_broadcast_message(server, &header, status, sizeof(SystemStatus));
 }
 
 // Public API implementation
-protocol_server_t* protocol_server_create(const server_config_t* config) {
-    protocol_server_t* server = calloc(1, sizeof(protocol_server_t));
+ProtocolServer* protocol_server_create(const ServerConfig* config) {
+    ProtocolServer* server = calloc(1, sizeof(ProtocolServer));
     if (!server) return NULL;
     
-    memcpy(&server->config, config, sizeof(server_config_t));
+    memcpy(&server->config, config, sizeof(ServerConfig));
     server->stats.start_time = get_timestamp_ms();
     
     // Initialize clients array
@@ -365,11 +364,11 @@ void protocol_server_stop(protocol_server_t* server) {
     printf("Protocol server stopped\n");
 }
 
-bool protocol_server_is_running(const protocol_server_t* server) {
+bool protocol_server_is_running(const ProtocolServer* server) {
     return server ? server->running : false;
 }
 
-void protocol_server_set_agent(protocol_server_t* server, data_agent_t* agent) {
+void protocol_server_set_agent(ProtocolServer* server, DataAgent* agent) {
     if (server && agent) {
         server->agent = agent;
         
@@ -381,12 +380,12 @@ void protocol_server_set_agent(protocol_server_t* server, data_agent_t* agent) {
     }
 }
 
-int protocol_server_get_client_count(const protocol_server_t* server) {
+int protocol_server_get_client_count(const ProtocolServer* server) {
     return server ? server->client_count : 0;
 }
 
-void protocol_server_broadcast_message(protocol_server_t* server, const protocol_header_t* header, 
-                                  const void* payload, size_t payload_size) {
+void protocol_server_broadcast_message(ProtocolServer* server, const ProtocolHeader* header, 
+                                  const void* payload, ByteCount payload_size) {
     if (!server || !server->running) return;
     
     pthread_mutex_lock(&server->clients_mutex);
@@ -395,7 +394,7 @@ void protocol_server_broadcast_message(protocol_server_t* server, const protocol
         if (server->clients[i].socket_fd >= 0) {
             if (send_protocol_message(server->clients[i].socket_fd, header, payload, payload_size)) {
                 server->stats.messages_sent++;
-                server->stats.bytes_transferred += sizeof(protocol_header_t) + payload_size;
+                server->stats.bytes_transferred += sizeof(ProtocolHeader) + payload_size;
             }
         }
     }
@@ -403,9 +402,9 @@ void protocol_server_broadcast_message(protocol_server_t* server, const protocol
     pthread_mutex_unlock(&server->clients_mutex);
 }
 
-void protocol_server_send_to_client(protocol_server_t* server, int client_id, 
-                                const protocol_header_t* header, const void* payload, 
-                                size_t payload_size) {
+void protocol_server_send_to_client(ProtocolServer* server, int client_id, 
+                                const ProtocolHeader* header, const void* payload, 
+                                ByteCount payload_size) {
     if (!server || !server->running || client_id < 0 || client_id >= MAX_CLIENTS) return;
     
     pthread_mutex_lock(&server->clients_mutex);
@@ -413,17 +412,20 @@ void protocol_server_send_to_client(protocol_server_t* server, int client_id,
     if (server->clients[client_id].socket_fd >= 0) {
         if (send_protocol_message(server->clients[client_id].socket_fd, header, payload, payload_size)) {
             server->stats.messages_sent++;
-            server->stats.bytes_transferred += sizeof(protocol_header_t) + payload_size;
+            server->stats.bytes_transferred += sizeof(ProtocolHeader) + payload_size;
         }
     }
     
     pthread_mutex_unlock(&server->clients_mutex);
 }
 
-server_stats_t protocol_server_get_stats(const protocol_server_t* server) {
-    if (!server) return (server_stats_t){0};
+ServerStats protocol_server_get_stats(const ProtocolServer* server) {
+    if (!server) {
+        ServerStats empty_stats = {0};
+        return empty_stats;
+    }
     
-    server_stats_t stats = server->stats;
+    ServerStats stats = server->stats;
     stats.active_connections = server->client_count;
     
     return stats;

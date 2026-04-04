@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-typedef struct protocol_server ProtocolServer;
+typedef struct ProtocolServer ProtocolServer;
 
 // Server configuration
 typedef struct {
