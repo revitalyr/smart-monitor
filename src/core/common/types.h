@@ -37,6 +37,8 @@ extern "C" {
 #define DEFAULT_FRAME_HEIGHT 480
 #define DEFAULT_MOTION_THRESHOLD 25
 #define DEFAULT_AUDIO_SAMPLE_RATE 44100
+#define DEFAULT_VIDEO_DEVICE "/dev/video0"
+#define DEFAULT_HTTP_PORT 8080
 
 /** @brief Protocol identifiers */
 #define PROTOCOL_VERSION_MAJOR 1

@@ -39,67 +39,62 @@
 #include <arpa/inet.h>
 #include <errno.h>
 
-#define DEFAULT_PORT 8080
-#define DEFAULT_DEVICE "/dev/video0"
-#define DEFAULT_WIDTH 640
-#define DEFAULT_HEIGHT 480
-
 /**
- * @struct monitor_packet_t
+ * @struct MonitorPacket
  * @brief Binary protocol structure for Web UI communication.
  * 
  * This packed structure contains all telemetry data sent from the agent
- * to the frontend.
+ * to the frontend using semantic types for clarity and type safety.
  */
 #pragma pack(push, 1)
 typedef struct {
-    uint32_t magic;           /**< Protocol identifier: 0x534D4F4E ('SMON') */
-    uint32_t uptime_secs;     /**< System uptime in seconds */
+    uint32_t magic;                    /**< Protocol identifier: PROTOCOL_MAGIC_BYTES */
+    DurationMs uptime_ms;               /**< System uptime in milliseconds */
     
-    uint32_t motion_events;   /**< Total count of detected motion events */
-    float    motion_level;    /**< Current intensity of motion (0.0 - 1.0) */
-    uint32_t frames_processed; /**< Total video frames processed */
-    float    frame_processing_latency_ms; /**< Time taken to process the last frame */
-    uint8_t  camera_active;   /**< Flag indicating if camera capture is running */
+    FrameCount motion_events;           /**< Total count of detected motion events */
+    MotionLevel motion_level;           /**< Current intensity of motion (0.0 - 1.0) */
+    FrameCount frames_processed;        /**< Total video frames processed */
+    float frame_processing_latency_ms;  /**< Time taken to process the last frame */
+    bool camera_active;                 /**< Flag indicating if camera capture is running */
 
-    float    temp;            /**< I2C Temperature sensor reading (°C) */
-    float    humidity;        /**< I2C Humidity sensor reading (%) */
-    uint16_t light;           /**< I2C Ambient light level (Lux) */
-    uint8_t  motion_detected; /**< I2C PIR sensor motion detection flag */
+    float temperature_c;               /**< I2C Temperature sensor reading (°C) */
+    float humidity_percent;             /**< I2C Humidity sensor reading (%) */
+    uint16_t light_lux;                /**< I2C Ambient light level (Lux) */
+    bool pir_motion_detected;          /**< I2C PIR sensor motion detection flag */
 
-    int16_t  acc_x, acc_y, acc_z; /**< SPI Accelerometer raw data */
+    int16_t acc_x, acc_y, acc_z;       /**< SPI Accelerometer raw data */
     
-    float    audio_level;     /**< RMS audio noise level */
-    uint8_t  audio_alert;     /**< Flag indicating significant noise detection (e.g. baby crying) */
+    MotionLevel audio_level;            /**< RMS audio noise level */
+    bool audio_alert;                   /**< Flag indicating significant noise detection */
 
-    // Данные от ESP32 (UART/BLE)
-    float    esp32_temp;
-    float    esp32_hum;
-    uint8_t  battery;
+    // ESP32 data (UART/BLE)
+    float esp32_temperature_c;
+    float esp32_humidity_percent;
+    uint8_t battery_percent;
 
-    // Системные метрики
-    uint8_t  cpu_usage;
-    uint8_t  mem_usage;
-} monitor_packet_t;
+    // System metrics
+    uint8_t cpu_usage_percent;
+    uint8_t memory_usage_percent;
+} MonitorPacket;
 #pragma pack(pop)
 
 /**
- * @struct config_t
+ * @struct SystemConfig
  * @brief System runtime configuration parameters.
  */
 typedef struct {
-    char* device;
-    port_t m_port;
-    bool m_mock_mode;
-    bool m_debug_mode;
-    char* m_log_file;
-    bool m_syslog_mode;
-    char* m_config_file;
-} config_t;
+    char* video_device;
+    PortNumber http_port;
+    bool mock_mode;
+    bool debug_mode;
+    char* log_file_path;
+    bool syslog_enabled;
+    char* config_file_path;
+} SystemConfig;
 
 static volatile bool running = true;
-static monitor_packet_t g_current_packet = { .magic = 0x534D4F4E };
-static time_t g_start_time;
+static MonitorPacket g_current_packet = { .magic = PROTOCOL_MAGIC_BYTES };
+static TimestampMs g_start_time;
 
 #ifdef ENABLE_AUDIO
 static bool g_audio_capture_enabled = true; // Global state for audio capture
@@ -110,15 +105,13 @@ static bool g_i2c_sensors_enabled = true; // Global state for I2C sensors
 #endif
 
 #ifdef ENABLE_SENSORS
-static uart_interface_t* g_uart = NULL;
-
 static void main_uart_command_callback(const char* command) {
     if (g_uart && command) {
-        char msg[256];
+        char msg[MAX_COMMAND_LENGTH];
         snprintf(msg, sizeof(msg), "Forwarding to UART: %s", command);
         uart_log_message(g_uart, "INFO", msg);
         uart_write(g_uart, command, strlen(command));
-        uart_write(g_uart, "\r\n", 2); // Конец команды
+        uart_write(g_uart, "\r\n", 2); // End of command
     }
 }
 #endif
@@ -129,14 +122,14 @@ static void main_uart_command_callback(const char* command) {
  * Initialized with default values and updated via command line arguments
  * or configuration file.
  */
-static config_t config = {
-    .device = DEFAULT_DEVICE,
-    .m_port = DEFAULT_PORT,
-    .m_mock_mode = false,
-    .m_debug_mode = false,
-    .m_log_file = NULL,
-    .m_syslog_mode = false,
-    .m_config_file = "/etc/smartmonitor.conf"
+static SystemConfig config = {
+    .video_device = DEFAULT_VIDEO_DEVICE,
+    .http_port = DEFAULT_HTTP_PORT,
+    .mock_mode = false,
+    .debug_mode = false,
+    .log_file_path = NULL,
+    .syslog_enabled = false,
+    .config_file_path = "/etc/smartmonitor.conf"
 };
 
 /**
@@ -145,7 +138,7 @@ static config_t config = {
  * @param port The port number to check.
  * @return true if the port is busy, false otherwise.
  */
-bool is_port_in_use(port_t port) {
+bool is_port_in_use(PortNumber port) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) return false;
     
