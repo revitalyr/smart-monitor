@@ -1,0 +1,227 @@
+/* Smart Monitor CSS Styles */
+
+:root {
+    --bg-page:       #111317;
+    --bg-tile:       #f0f2f5;
+    --bg-tile-inner: #e2e5ea;
+    --text-primary:  #1a1d23;
+    --text-secondary:#4a5060;
+    --text-muted:    #8a90a0;
+    --accent:        #00c853;
+    --accent-dark:   #00953d;
+    --accent-dim:    rgba(0, 200, 83, 0.15);
+    --border-tile:   rgba(0, 0, 0, 0.08);
+    --radius-tile:   14px;
+    --gap:           16px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 24px;
+}
+
+/* ── Header ───────────────────────────────────────────── */
+
+.header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.header h1 {
+    font-size: 2em;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+}
+
+.subtitle {
+    font-size: 1em;
+    color: #606878;
+}
+
+/* ── Navigation ───────────────────────────────────────── */
+
+.navigation {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 24px;
+    gap: 8px;
+}
+
+.nav-btn {
+    padding: 9px 20px;
+    background: #1e2128;
+    color: #9098a8;
+    border: 1px solid #2a2f3a;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.nav-btn:hover {
+    background: #262c38;
+    color: #ffffff;
+}
+
+.nav-btn.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent-dark);
+}
+
+/* ── Pages ────────────────────────────────────────────── */
+
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+/* ── Tile grid — фиксированная 3×N ───────────────────── */
+
+.dashboard {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    gap: var(--gap);
+    align-items: start;
+}
+
+/* Тайл на всю ширину (добавьте класс card--wide в HTML) */
+.card--wide {
+    grid-column: 1 / -1;
+}
+
+/* Тайл на 2 колонки */
+.card--half {
+    grid-column: span 2;
+}
+
+/* ── Tile card ────────────────────────────────────────── */
+
+.card {
+    background: var(--bg-tile);
+    border-radius: var(--radius-tile);
+    padding: 20px;
+    border: 1px solid var(--border-tile);
+    box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.08),
+        0 4px 12px rgba(0, 0, 0, 0.06);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card:hover {
+    box-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.10),
+        0 8px 24px rgba(0, 0, 0, 0.10);
+    transform: translateY(-2px);
+}
+
+.card h3 {
+    margin-bottom: 14px;
+    color: var(--text-primary);
+    font-size: 0.95em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.icon {
+    font-size: 1.1em;
+}
+
+/* ── Status dots ──────────────────────────────────────── */
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.status-dot.online  { background: var(--accent); box-shadow: 0 0 0 3px rgba(0,200,83,0.2); }
+.status-dot.offline { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.2); }
+.status-dot.alert   { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+
+/* ── Chart container ──────────────────────────────────── */
+
+.chart-container {
+    height: 260px;
+    margin-top: 12px;
+}
+
+/* ── Log ──────────────────────────────────────────────── */
+
+.log-container {
+    background: var(--bg-tile-inner);
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.log-entry {
+    font-family: 'Courier New', monospace;
+    font-size: 0.82em;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.log-info    { background: rgba(0, 200, 83, 0.08);  color: #1a6640; }
+.log-warning { background: rgba(245, 158, 11, 0.10); color: #7a5000; }
+.log-error   { background: rgba(239, 68, 68, 0.10);  color: #8a1a1a; }
+
+/* ── Responsive ───────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+    .dashboard {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .card--wide {
+        grid-column: 1 / -1;
+    }
+    .card--half {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 640px) {
+    .container {
+        padding: 12px;
+    }
+    .dashboard {
+        grid-template-columns: 1fr;
+    }
+    .card--wide,
+    .card--half {
+        grid-column: 1;
+    }
+    .navigation {
+        flex-wrap: wrap;
+    }
+}
