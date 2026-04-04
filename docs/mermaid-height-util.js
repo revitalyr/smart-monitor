@@ -192,17 +192,21 @@ class MermaidHeightAdjuster {
     adjustDiagram(container) {
         const svg = container.querySelector('svg');
         if (svg) {
-            // Get the SVG bounding box
+            // Get the SVG bounding box before scaling
             const bbox = svg.getBBox();
-            const padding = 40; // Add some padding
+            const padding = 60; // Increased padding for controls
             
             // Set container height to accommodate scaled SVG
             const scale = this.getCurrentScale(container);
             const scaledHeight = (bbox.height + padding) * (scale / 100);
             const scaledWidth = (bbox.width + padding) * (scale / 100);
             
-            container.style.minHeight = `${Math.max(scaledHeight, 300)}px`;
-            container.style.minWidth = `${Math.max(scaledWidth, 400)}px`;
+            // Ensure minimum dimensions and accommodate controls
+            container.style.minHeight = `${Math.max(scaledHeight, 400)}px`;
+            container.style.minWidth = `${Math.max(scaledWidth, 600)}px`;
+            
+            // Ensure container can scroll if needed
+            container.style.overflow = 'auto';
         }
     }
 
