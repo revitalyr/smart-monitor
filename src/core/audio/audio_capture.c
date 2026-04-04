@@ -14,16 +14,16 @@
 #define BUFFER_SIZE 4096
 #define VOICE_THRESHOLD 0.1f
 
-audio_capture_t* audio_create(const char* device) {
+AudioCapture* audio_create(const char* device) {
     (void)device; // Suppress unused parameter warning
-    audio_capture_t* audio = malloc(sizeof(audio_capture_t));
+    AudioCapture* audio = malloc(sizeof(AudioCapture));
     if (!audio) {
         return NULL;
     }
     
-    memset(audio, 0, sizeof(audio_capture_t));
+    memset(audio, 0, sizeof(AudioCapture));
     audio->fd = -1;
-    audio->sample_rate = 44100;
+    audio->sample_rate = DEFAULT_AUDIO_SAMPLE_RATE;
     audio->channels = 1;
     audio->capturing = false;
     audio->buffer_size = BUFFER_SIZE;
@@ -31,8 +31,8 @@ audio_capture_t* audio_create(const char* device) {
     return audio;
 }
 
-audio_capture_t* audio_create_mock(void) {
-    audio_capture_t* audio = audio_create("mock");
+AudioCapture* audio_create_mock(void) {
+    AudioCapture* audio = audio_create("mock");
     if (audio) {
         audio->buffer = malloc(BUFFER_SIZE);
         audio->initialized = true;
@@ -40,7 +40,7 @@ audio_capture_t* audio_create_mock(void) {
     return audio;
 }
 
-bool audio_initialize(audio_capture_t* audio, int sample_rate, int channels) {
+bool audio_initialize(AudioCapture* audio, SampleRate sample_rate, uint8_t channels) {
     if (!audio) {
         return false;
     }
@@ -55,7 +55,7 @@ bool audio_initialize(audio_capture_t* audio, int sample_rate, int channels) {
     return true;
 }
 
-void audio_destroy(audio_capture_t* audio) {
+void audio_destroy(AudioCapture* audio) {
     if (!audio) {
         return;
     }
@@ -67,7 +67,7 @@ void audio_destroy(audio_capture_t* audio) {
     free(audio);
 }
 
-bool audio_start_capture(audio_capture_t* audio) {
+bool audio_start_capture(AudioCapture* audio) {
     if (!audio || !audio->initialized) {
         return false;
     }
@@ -76,21 +76,21 @@ bool audio_start_capture(audio_capture_t* audio) {
     return true;
 }
 
-void audio_stop_capture(audio_capture_t* audio) {
+void audio_stop_capture(AudioCapture* audio) {
     if (!audio) {
         return;
     }
     audio->capturing = false;
 }
 
-bool audio_is_capturing(const audio_capture_t* audio) {
+bool audio_is_capturing(const AudioCapture* audio) {
     if (!audio) {
         return false;
     }
     return audio->capturing;
 }
 
-int audio_read_samples(audio_capture_t* audio, uint8_t* buffer, int size) {
+int audio_read_samples(AudioCapture* audio, AudioBuffer buffer, ByteCount size) {
     if (!audio || !audio->initialized) {
         return -1;
     }
@@ -103,7 +103,7 @@ int audio_read_samples(audio_capture_t* audio, uint8_t* buffer, int size) {
     return size;
 }
 
-void audio_generate_mock_samples(audio_capture_t* audio, uint8_t* buffer, int size) {
+void audio_generate_mock_samples(AudioCapture* audio, AudioBuffer buffer, ByteCount size) {
     (void)audio; // Suppress unused parameter warning
     static float phase = 0.0f;
     static uint32_t counter = 0;
@@ -132,8 +132,8 @@ void audio_generate_mock_samples(audio_capture_t* audio, uint8_t* buffer, int si
     }
 }
 
-audio_metrics_t audio_analyze_samples(const uint8_t* samples, int count) {
-    audio_metrics_t metrics = {0};
+AudioMetrics audio_analyze_samples(const AudioBuffer samples, SampleCount count) {
+    AudioMetrics metrics = {0};
     
     metrics.sample_count = count;
     metrics.noise_level = audio_calculate_rms(samples, count);
@@ -141,9 +141,9 @@ audio_metrics_t audio_analyze_samples(const uint8_t* samples, int count) {
     
     // Calculate peak level
     int16_t* samples16 = (int16_t*)samples;
-    float peak = 0.0f;
+    MotionLevel peak = 0.0f;
     for (int i = 0; i < count / 2; i++) {
-        float abs_sample = fabsf((float)samples16[i]);
+        MotionLevel abs_sample = fabsf((MotionLevel)samples16[i]);
         if (abs_sample > peak) {
             peak = abs_sample;
         }
@@ -153,7 +153,7 @@ audio_metrics_t audio_analyze_samples(const uint8_t* samples, int count) {
     return metrics;
 }
 
-float audio_calculate_rms(const uint8_t* samples, int count) {
+MotionLevel audio_calculate_rms(const AudioBuffer samples, SampleCount count) {
     if (count == 0) return 0.0f;
     
     int16_t* samples16 = (int16_t*)samples;
@@ -167,7 +167,7 @@ float audio_calculate_rms(const uint8_t* samples, int count) {
     return sqrtf(sum / (count / 2));
 }
 
-bool audio_detect_voice_activity(const uint8_t* samples, int count, float threshold) {
-    float rms = audio_calculate_rms(samples, count);
+bool audio_detect_voice_activity(const AudioBuffer samples, SampleCount count, MotionLevel threshold) {
+    MotionLevel rms = audio_calculate_rms(samples, count);
     return rms > threshold;
 }

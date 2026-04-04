@@ -476,16 +476,16 @@ char* generate_sensor_json(void) {
 }
 
 char* generate_audio_json(void) {
-    audio_data_t data = {0};
-    generate_realistic_audio_data(&data);
+    AudioData data = {0};
+    generate_realistic_audio_data((audio_data_t*)&data);
     
     char* json = malloc(256);
     if (json) {
         snprintf(json, 256,
-            "{\"enabled\":true,\"capturing\":true,\"noise_level\":%.3f,\"voice_activity\":%s,\"baby_crying\":%s,\"screaming\":%s,\"peak_frequency\":%d}",
+            "{\"enabled\":true,\"capturing\":true,\"noise_level\":%.3f,\"voice_activity\":%s,\"baby_crying\":%s,\"screaming\":%s,\"peak_frequency_hz\":%d}",
             data.noise_level, data.voice_activity ? "true" : "false", 
             data.baby_crying ? "true" : "false", data.screaming ? "true" : "false",
-            data.peak_frequency);
+            data.peak_frequency_hz);
     }
     return json;
 }
@@ -549,7 +549,7 @@ char* generate_video_json(void) {
 // ---------------------------------------------------------------------------
 // Public API for setting callbacks
 // ---------------------------------------------------------------------------
-void data_agent_set_http_callbacks(data_agent_t* agent, 
+void data_agent_set_http_callbacks(DataAgent* agent, 
                                    char* (*sensor_cb)(void),
                                    char* (*audio_cb)(void),
                                    char* (*system_cb)(void)) {
@@ -598,7 +598,7 @@ static void* agent_worker_thread(void* arg) {
             SensorData sensor_data = {0};
             
             if (agent->config.enable_simulation) {
-                generate_realistic_sensor_data((sensor_data_t*)&sensor_data);
+                generate_realistic_sensor_data(&sensor_data);
             } else {
                 // Read from real sensors - not implemented yet
                 sensor_data.temperature_c = 22.0f + (rand() % 100) * 0.1f;
@@ -618,16 +618,17 @@ static void* agent_worker_thread(void* arg) {
             AudioData audio_data = {0};
             
             if (agent->config.enable_simulation) {
-                generate_realistic_audio_data((audio_data_t*)&audio_data);
+                generate_realistic_audio_data(&audio_data);
             } else if (agent->audio && agent->noise_detector) {
                 // Read from real audio
                 uint8_t audio_samples[1024];
                 int samples_read = audio_read_samples(agent->audio, audio_samples, sizeof(audio_samples));
                 if (samples_read > 0) {
                     noise_metrics_t metrics = noise_detector_analyze(agent->noise_detector, audio_samples, samples_read);
-                    audio_data.audio_level = metrics.m_noise_level;
-                    audio_data.voice_detected = metrics.m_voice_activity;
-                    audio_data.audio_alert = metrics.m_baby_crying_detected || metrics.m_screaming_detected;
+                    audio_data.noise_level = metrics.m_noise_level;
+                    audio_data.voice_activity = metrics.m_voice_activity;
+                    audio_data.baby_crying = metrics.m_baby_crying_detected;
+                    audio_data.screaming = metrics.m_screaming_detected;
                     audio_data.peak_frequency_hz = 1000 + (rand() % 3000);
                 }
             }
