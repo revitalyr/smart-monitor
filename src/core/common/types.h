@@ -43,7 +43,7 @@ extern "C" {
 /** @brief Protocol identifiers */
 #define PROTOCOL_VERSION_MAJOR 1
 #define PROTOCOL_VERSION_MINOR 0
-#define PROTOCOL_MAGIC_BYTES 0x534D4D54  // "SMMT"
+#define PROTOCOL_MAGIC_BYTES 0x534D  // "SM" truncated to 16-bit
 
 /** @brief Error codes */
 #define ERROR_NONE 0
@@ -52,6 +52,11 @@ extern "C" {
 #define ERROR_DEVICE_NOT_FOUND -3
 #define ERROR_COMMUNICATION_FAILED -4
 #define ERROR_INITIALIZATION_FAILED -5
+
+/** @brief Audio detection thresholds */
+#define AUDIO_BABY_CRYING_THRESHOLD 0.7f
+#define AUDIO_SCREAMING_THRESHOLD 0.9f
+#define AUDIO_VOICE_ACTIVITY_THRESHOLD 0.3f
 
 // =============================================================================
 // SEMANTIC TYPE ALIASES (Strong Typing)
@@ -155,26 +160,8 @@ typedef enum {
 // =============================================================================
 
 /** @brief Protocol magic numbers and identifiers */
-#define PROTOCOL_HEADER_SIZE 8
-#define PROTOCOL_CHECKSUM_SIZE 4
+#define PROTOCOL_HEADER_SIZE 16
 #define PROTOCOL_MAX_PACKET_SIZE 1024
-
-/** @brief Command identifiers */
-#define CMD_PING 0x01
-#define CMD_STATUS 0x02
-#define CMD_CONFIGURE 0x03
-#define CMD_START_CAPTURE 0x04
-#define CMD_STOP_CAPTURE 0x05
-#define CMD_GET_FRAME 0x06
-#define CMD_MOTION_DETECT 0x07
-#define CMD_RESET 0xFF
-
-/** @brief Response identifiers */
-#define RESP_OK 0x00
-#define RESP_ERROR 0x01
-#define RESP_BUSY 0x02
-#define RESP_INVALID_CMD 0x03
-#define RESP_DATA_READY 0x04
 
 // =============================================================================
 // HARDWARE CONSTANTS

@@ -31,7 +31,7 @@
 #define API_VIDEO_STATUS "/video/status"
 #define API_SYSTEM_LOGS "/system/logs"
 
-#define BINARY_METRICS_SIZE 58 // Размер структуры monitor_packet_t (54 + 4 для latency)
+#define BINARY_METRICS_SIZE 58 // Size of monitor_packet_t structure (54 + 4 for latency)
 
 struct http_server {
     port_t m_port;
@@ -42,6 +42,7 @@ struct http_server {
     audio_toggle_callback_t m_audio_toggle_callback;
     i2c_toggle_callback_t m_i2c_toggle_callback;
     uart_command_callback_t m_uart_command_callback;
+    void* m_uart_context;
     metrics_data_t m_metrics;
     
     metrics_callback_t m_metrics_callback;
@@ -415,7 +416,7 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
         char* body = strstr(buffer, "\r\n\r\n");
         if (body && server->m_uart_command_callback) {
             body += 4;
-            // Простой поиск "command":"значение" в JSON теле
+            // Simple search for "command":"value" in JSON body
             char* cmd_key = strstr(body, "\"command\"");
             if (cmd_key) {
                 char* start = strchr(cmd_key + 9, '\"');
@@ -424,11 +425,14 @@ static void handle_request(file_fd_t client_fd, http_server_t* server) {
                     char* end = strchr(start, '\"');
                     if (end) {
                         *end = '\0';
-                        server->m_uart_command_callback(start);
+                        // Extract command and send via UART
+                        if (server->m_uart_command_callback) {
+                            server->m_uart_command_callback(start);
+                        }
                         
                         char response[256];
                         snprintf(response, sizeof(response), "{\"status\":\"sent\",\"command\":\"%s\"}", start);
-                        *end = '\"'; // Восстанавливаем буфер
+                        *end = '\"'; // Restore buffer
                         send_response(client_fd, "200 OK", "application/json", response, strlen(response), "no-cache");
                         return;
                     }

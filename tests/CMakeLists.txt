@@ -8,9 +8,10 @@ include_directories(${CMAKE_SOURCE_DIR}/src/core)
 include_directories(${CMAKE_SOURCE_DIR}/src/core/common)
 include_directories(${GTEST_INCLUDE_DIRS})
 
-# Test sources - only basic working files
+# Test sources - include semantic types tests
 set(TEST_SOURCES
     unit/test_basic.cpp
+    unit/test_semantic_types.cpp
 )
 
 # Create test executable
@@ -22,6 +23,7 @@ target_link_libraries(smart_monitor_tests
     ${GTEST_MAIN_LIBRARIES}
     pthread
     m
+    smart_monitor_core
 )
 
 # Set test properties
@@ -40,7 +42,9 @@ target_compile_options(smart_monitor_tests PRIVATE
 # Register tests with CTest
 add_test(NAME BasicTests COMMAND smart_monitor_tests --gtest_filter="SanityTest.*")
 add_test(NAME FunctionalityTests COMMAND smart_monitor_tests --gtest_filter="BasicFunctionalityTest.*")
+add_test(NAME TypesIntegrationTests COMMAND smart_monitor_tests --gtest_filter="SemanticTypesTest.*")
 
 # Set test properties
 set_tests_properties(BasicTests PROPERTIES TIMEOUT 30)
 set_tests_properties(FunctionalityTests PROPERTIES TIMEOUT 30)
+set_tests_properties(TypesIntegrationTests PROPERTIES TIMEOUT 60)

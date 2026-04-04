@@ -2,10 +2,10 @@
 #include <string.h>
 
 // CRC16 calculation (CCITT polynomial)
-uint16_t protocol_calculate_crc(const uint8_t* data, size_t length) {
+uint16_t protocol_calculate_crc(const uint8_t* data, ByteCount length) {
     uint16_t crc = 0xFFFF;
     
-    for (size_t i = 0; i < length; i++) {
+    for (ByteCount i = 0; i < length; i++) {
         crc ^= data[i];
         for (int j = 0; j < 8; j++) {
             if (crc & 0x0001) {
@@ -19,14 +19,14 @@ uint16_t protocol_calculate_crc(const uint8_t* data, size_t length) {
     return crc;
 }
 
-bool protocol_validate_header(const protocol_header_t* header) {
+bool protocol_validate_header(const ProtocolHeader* header) {
     // Check magic bytes
-    if (header->magic != PROTOCOL_MAGIC) {
+    if (header->magic != PROTOCOL_MAGIC_BYTES) {
         return false;
     }
     
     // Check version
-    if (header->version != PROTOCOL_VERSION) {
+    if (header->version != PROTOCOL_VERSION_MAJOR) {
         return false;
     }
     
@@ -43,13 +43,13 @@ bool protocol_validate_header(const protocol_header_t* header) {
     return true;
 }
 
-void protocol_create_header(protocol_header_t* header, message_type_t type, 
-                        uint32_t sequence, uint32_t timestamp, 
+void protocol_create_header(ProtocolHeader* header, MessageType type, 
+                        uint32_t sequence, TimestampMs timestamp, 
                         uint16_t payload_length) {
-    memset(header, 0, sizeof(protocol_header_t));
+    memset(header, 0, sizeof(ProtocolHeader));
     
-    header->magic = PROTOCOL_MAGIC;
-    header->version = PROTOCOL_VERSION;
+    header->magic = PROTOCOL_MAGIC_BYTES;
+    header->version = PROTOCOL_VERSION_MAJOR;
     header->type = type;
     header->sequence = sequence;
     header->timestamp = timestamp;

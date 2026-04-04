@@ -5,59 +5,6 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <math.h>
-#include <stdio.h>
-
-// DataAgent structure definition
-struct data_agent {
-    AgentConfig config;
-    bool running;
-    pthread_t worker_thread;
-    bool thread_active;
-};
-
-// Baby sleep state simulation
-typedef enum {
-    BABY_SLEEPING_PEACEFUL,  // Peaceful sleep
-    BABY_RESTLESS,           // Restless sleep (first sign - movement)
-    BABY_STIRRING,           // Stirring + first sounds
-    BABY_FUSSY,              // Fussy, active vocalization
-    BABY_CRYING_SOFT,        // Soft crying
-    BABY_CRYING_LOUD,        // Loud crying
-    BABY_SCREAMING,          // Screaming
-    BABY_FALLING_ASLEEP      // Calming down, falling asleep
-} baby_state_t;
-
-// State change reason - used for logging
-typedef enum {
-    TRIGGER_TIMEOUT,         // State timer expired
-    TRIGGER_ROOM_TOO_HOT,    // Room too hot (>24°C)
-    TRIGGER_ROOM_TOO_COLD,   // Room too cold (<18°C)
-    TRIGGER_RANDOM           // Random transition (hunger, dreams, etc.)
-} state_trigger_t;
-
-typedef struct {
-    baby_state_t state;
-    uint32_t     state_duration;   // ms until next state evaluation
-    uint32_t     state_timer;      // accumulated time in current state
-
-    // Physical parameters with their own inertia
-    float room_temp;          // air temperature, °C
-    float body_temp;          // baby body temperature, °C (normal ~36.6)
-    float humidity;           // air humidity, %
-    uint16_t light_lux;       // illumination, lux
-
-    // Internal "smoothed" levels (used as target for LP-filter)
-    float target_noise;
-    float smooth_noise;       // smoothed noise_level (RC-filter)
-    float smooth_motion_prob; // motion probability [0..1] (smoothed)
-
-    uint32_t event_count;
-    state_trigger_t last_trigger;
-
-    // Flag: parent turned on nightlight (resets after ~30s)
-    bool nightlight_on;
-    uint32_t nightlight_timer;
-} baby_simulation_t;
 
 // Global simulation state
 static baby_simulation_t g_sim = {
@@ -351,6 +298,7 @@ static void generate_realistic_audio_data(AudioData* data) {
     data->peak_frequency_hz = (uint16_t)(freq_min[si] + (rand() % freq_range[si]));
 }
 
+// JSON generation functions
 char* generate_sensor_json(const SensorData* data) {
     char* json = malloc(512);
     if (!json) return NULL;
@@ -447,7 +395,6 @@ AudioData data_agent_get_audio_data(const DataAgent* agent) {
     AudioData data = {0};
     generate_realistic_audio_data(&data);
     return data;
-}
 
 char* data_agent_get_sensor_json(const DataAgent* agent) {
     SensorData data = data_agent_get_sensor_data(agent);

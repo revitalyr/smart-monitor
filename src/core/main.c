@@ -213,8 +213,8 @@ void print_usage(const char* program_name) {
     printf("Usage: %s [OPTIONS]\n", program_name);
     printf("Smart Monitor - Embedded Video Analytics System\n\n");
     printf("Options:\n");
-    printf("  -d, --device DEVICE    Camera device (default: %s)\n", DEFAULT_DEVICE);
-    printf("  -p, --port PORT        HTTP port (default: %d)\n", DEFAULT_PORT);
+    printf("  -d, --device DEVICE  Camera device (default: %s)\n", DEFAULT_VIDEO_DEVICE);
+    printf("  -p, --port PORT        HTTP port (default: %d)\n", DEFAULT_HTTP_PORT);
     printf("  -m, --mock           Enable mock mode (no camera required)\n");
     printf("  -D, --debug           Enable debug output\n");
     printf("  -l, --log-file FILE  Log to file\n");
@@ -253,25 +253,25 @@ void parse_arguments(int argc, char* argv[]) {
     while ((c = getopt_long(argc, argv, "d:p:MDl:sc:h", long_options, &option_index)) != -1) {
         switch (c) {
             case 'd':
-                config.device = strdup(optarg);
+                config.video_device = strdup(optarg);
                 break;
             case 'p':
-                config.m_port = atoi(optarg);
+                config.http_port = atoi(optarg);
                 break;
             case 'm':
-                config.m_mock_mode = true;
+                config.mock_mode = true;
                 break;
             case 'D':
-                config.m_debug_mode = true;
+                config.debug_mode = true;
                 break;
             case 'l':
-                config.m_log_file = strdup(optarg);
+                config.log_file_path = strdup(optarg);
                 break;
             case 's':
-                config.m_syslog_mode = true;
+                config.syslog_enabled = true;
                 break;
             case 'c':
-                config.m_config_file = strdup(optarg);
+                config.config_file_path = strdup(optarg);
                 break;
             case 'h':
                 print_usage(argv[0]);
@@ -291,10 +291,10 @@ void parse_arguments(int argc, char* argv[]) {
  * Parses key=value pairs and ignores comments.
  */
 void load_config_file() {
-    FILE* file = fopen(config.m_config_file, "r");
+    FILE* file = fopen(config.config_file_path, "r");
     if (!file) {
-        if (config.m_debug_mode) {
-            printf("Config file %s not found, using defaults\n", config.m_config_file);
+        if (config.debug_mode) {
+            printf("Config file %s not found, using defaults\n", config.config_file_path);
         }
         return;
     }
@@ -308,13 +308,13 @@ void load_config_file() {
         
         if (key && value) {
             if (strcmp(key, "device") == 0) {
-                config.device = strdup(value);
+                config.video_device = strdup(value);
             } else if (strcmp(key, "port") == 0) {
-                config.m_port = atoi(value);
+                config.http_port = atoi(value);
             } else if (strcmp(key, "mock_mode") == 0) {
-                config.m_mock_mode = (strcmp(value, "true") == 0);
+                config.mock_mode = (strcmp(value, "true") == 0);
             } else if (strcmp(key, "debug") == 0) {
-                config.m_debug_mode = (strcmp(value, "true") == 0);
+                config.debug_mode = (strcmp(value, "true") == 0);
             }
         }
     }
@@ -327,19 +327,19 @@ void load_config_file() {
  * Persists audio and sensor states across reboots.
  */
 void save_config_file() {
-    FILE* file = fopen(config.m_config_file, "w");
+    FILE* file = fopen(config.config_file_path, "w");
     if (!file) {
         char err_msg[256];
-        snprintf(err_msg, sizeof(err_msg), "Failed to save config to %s", config.m_config_file);
+        snprintf(err_msg, sizeof(err_msg), "Failed to save config to %s", config.config_file_path);
         perror("Failed to save config");
         return;
     }
 
     fprintf(file, "# Smart Monitor Auto-saved Configuration\n");
-    fprintf(file, "device=%s\n", config.device ? config.device : DEFAULT_DEVICE);
-    fprintf(file, "port=%d\n", config.m_port);
-    fprintf(file, "mock_mode=%s\n", config.m_mock_mode ? "true" : "false");
-    fprintf(file, "debug=%s\n", config.m_debug_mode ? "true" : "false");
+    fprintf(file, "device=%s\n", config.video_device ? config.video_device : DEFAULT_VIDEO_DEVICE);
+    fprintf(file, "port=%d\n", config.http_port);
+    fprintf(file, "mock_mode=%s\n", config.mock_mode ? "true" : "false");
+    fprintf(file, "debug=%s\n", config.debug_mode ? "true" : "false");
 
 #ifdef ENABLE_AUDIO
     fprintf(file, "enable_audio=%s\n", g_audio_capture_enabled ? "true" : "false");
@@ -397,7 +397,7 @@ char* calculate_uptime(time_t start_time) {
  * @param mem Pointer to store Memory usage percentage.
  */
 static void update_system_info(uint8_t *cpu, uint8_t *mem) {
-    // Расчет использования RAM через /proc/meminfo
+    // Calculate RAM usage via /proc/meminfo
     FILE *fp = fopen("/proc/meminfo", "r");
     if (fp) {
         long total = 0, available = 0;
@@ -412,17 +412,17 @@ static void update_system_info(uint8_t *cpu, uint8_t *mem) {
         }
     }
 
-    // Расчет загрузки CPU через /proc/stat
+    // Calculate CPU usage via /proc/stat
     static long long last_total = 0, last_idle = 0;
     fp = fopen("/proc/stat", "r");
     if (fp) {
-        long long user, nice, system, idle, iowait, irq, softirq, steal;
-        // Читаем первую строку (суммарная статистика по всем ядрам)
-        if (fscanf(fp, "cpu %lld %lld %lld %lld %lld %lld %lld %lld", 
-                   &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal) >= 4) {
+        long long user, nice, system, idle, iowait, irq, softirq;
+        // Read first line (total statistics for all cores)
+        if (fscanf(fp, "cpu %lld %lld %lld %lld %lld %lld %lld", 
+                   &user, &nice, &system, &idle, &iowait, &irq, &softirq) >= 4) {
             
             long long current_idle = idle + iowait;
-            long long current_total = user + nice + system + current_idle + irq + softirq + steal;
+            long long current_total = user + nice + system + current_idle + irq + softirq;
             
             if (last_total != 0) {
                 long long total_diff = current_total - last_total;
@@ -446,22 +446,22 @@ static void update_system_info(uint8_t *cpu, uint8_t *mem) {
  * @note The HTTP server is responsible for freeing the returned memory.
  */
 char* metrics_callback_wrapper(void) {
-    // Обновляем системные показатели перед отправкой пакета
-    update_system_info(&g_current_packet.cpu_usage, &g_current_packet.mem_usage);
+    // Update system metrics before sending packet
+    update_system_info(&g_current_packet.cpu_usage_percent, &g_current_packet.memory_usage_percent);
     g_current_packet.frame_processing_latency_ms = 0.0f; // Reset or update elsewhere
 
-    // Обновляем аптайм перед отправкой
-    g_current_packet.uptime_secs = (uint32_t)difftime(time(NULL), g_start_time);
+    // Update uptime before sending
+    g_current_packet.uptime_ms = (TimestampMs)difftime(time(NULL), g_start_time) * 1000;
     
-    // Выделяем память под копию структуры (HTTP сервер освободит её после отправки)
-    monitor_packet_t* response = malloc(sizeof(monitor_packet_t));
-    memcpy(response, &g_current_packet, sizeof(monitor_packet_t));
+    // Allocate memory for copy of structure (HTTP server will free it after sending)
+    MonitorPacket* response = malloc(sizeof(MonitorPacket));
+    memcpy(response, &g_current_packet, sizeof(MonitorPacket));
     
     return (char*)response;
 }
 
 #ifdef ENABLE_AUDIO
-static audio_capture_t* audio_capture_instance = NULL; // Global audio instance
+static AudioCapture* audio_capture_instance = NULL; // Global audio instance
 static noise_detector_t* noise_detector_instance = NULL; // Global noise detector instance
 
 /**
@@ -519,13 +519,13 @@ int main(int argc, char* argv[]) {
     load_config_file();
     
     // Check if port is already in use and shutdown existing instance
-    if (is_port_in_use(config.m_port)) {
-        printf("Port %d is already in use. Attempting to shutdown existing instance...\n", config.m_port);
-        shutdown_existing_instance(config.m_port);
+    if (is_port_in_use(config.http_port)) {
+        printf("Port %d is already in use. Attempting to shutdown existing instance...\n", config.http_port);
+        shutdown_existing_instance(config.http_port);
         
         // Check again after shutdown attempt
-        if (is_port_in_use(config.m_port)) {
-            fprintf(stderr, "Error: Port %d is still in use. Another instance may be running.\n", config.m_port);
+        if (is_port_in_use(config.http_port)) {
+            fprintf(stderr, "Error: Port %d is still in use. Another instance may be running.\n", config.http_port);
             fprintf(stderr, "Please manually kill the process or use a different port.\n");
             return 1;
         }
@@ -533,7 +533,7 @@ int main(int argc, char* argv[]) {
     }
     
     // Setup logging
-    if (config.m_debug_mode) {
+    if (config.debug_mode) {
         printf("DEBUG: Smart Monitor starting in debug mode\n");
     }
     
@@ -546,18 +546,18 @@ int main(int argc, char* argv[]) {
     g_start_time = time(NULL);
     
     // Initialize components with config
-    const char* device = config.m_mock_mode ? NULL : config.device;
-    v4l2_capture_t* camera = v4l2_create(device);
+    const char* device = config.mock_mode ? NULL : config.video_device;
+    V4L2Capture* camera = v4l2_create(device);
     if (!camera) {
         perror("Failed to create camera");
     }
     
-    rust_motion_detector_t* motion_detector = rust_detector_create();
+    MotionDetector* motion_detector = rust_detector_create();
     if (!motion_detector) {
         perror("Failed to create motion detector");
     }
     
-    http_server_t* http_server = http_server_create(config.m_port);
+    http_server_t* http_server = http_server_create(config.http_port);
     if (!http_server) {
         perror("Failed to create HTTP server");
     }
@@ -574,8 +574,8 @@ int main(int argc, char* argv[]) {
     }
     
     // Initialize camera
-    if (!v4l2_initialize(camera, DEFAULT_WIDTH, DEFAULT_HEIGHT)) {
-        if (config.m_mock_mode) {
+    if (!v4l2_initialize(camera, DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT)) {
+        if (config.mock_mode) {
             printf("INFO: Mock mode enabled\n");
         } else {
             printf("WARNING: Failed to initialize camera, using mock mode\n");
@@ -586,7 +586,7 @@ int main(int argc, char* argv[]) {
     
     // Initialize motion detector
     if (!rust_detector_initialize(motion_detector)) {
-        if (config.m_mock_mode) {
+        if (config.mock_mode) {
             printf("INFO: Mock mode: motion detector initialization skipped\n");
         } else {
             fprintf(stderr, "ERROR: Failed to initialize motion detector\n");
@@ -603,7 +603,7 @@ int main(int argc, char* argv[]) {
     }
     
     char port_msg[64];
-    snprintf(port_msg, sizeof(port_msg), "HTTP server started on port %d", config.m_port);
+    snprintf(port_msg, sizeof(port_msg), "HTTP server started on port %d", config.http_port);
     printf("INFO: %s\n", port_msg);
     
     // Initialize WebRTC server
@@ -615,7 +615,7 @@ int main(int argc, char* argv[]) {
     
     // Initialize optional components
     #ifdef ENABLE_AUDIO
-    audio_capture_t* audio = audio_create_mock();
+    AudioCapture* audio = audio_create_mock();
     if (audio && audio_initialize(audio, 44100, 1)) {
         audio_start_capture(audio);
         printf("INFO: Audio capture initialized\n");
@@ -677,7 +677,7 @@ int main(int argc, char* argv[]) {
     
     while (running) {
         uint8_t* current_frame = NULL;
-        size_t current_frame_size = 0;
+        ByteCount current_frame_size = 0;
         
         if (v4l2_is_initialized(camera)) {
             current_frame = v4l2_read_frame_raw(camera, &current_frame_size);
@@ -735,13 +735,13 @@ int main(int argc, char* argv[]) {
                             long long elapsed_ns;
 
                             clock_gettime(CLOCK_MONOTONIC, &start_time_ns);
-                            motion_result_t result = rust_detector_detect_motion_advanced(
+                            MotionResult result = rust_detector_detect_motion_advanced(
                                 motion_detector,
                                 gray_prev,
                                 gray_current,
-                                640,
-                                480,
-                                20
+                                DEFAULT_FRAME_WIDTH,
+                                DEFAULT_FRAME_HEIGHT,
+                                (MotionThreshold)20
                             );
                             
                             // Restore default signal handler
